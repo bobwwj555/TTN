@@ -9,7 +9,7 @@
  * Logs connection events for history
  */
 
-require_once '/home/obdswlpx/ttn_config.php';
+require_once '/etc/ttn_config.php';
 require_once TTN_INCLUDES . '/db.php';
 
 header('Content-Type: application/json');

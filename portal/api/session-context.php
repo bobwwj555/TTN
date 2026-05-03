@@ -35,10 +35,10 @@ if (($_GET['k'] ?? '') !== $valid_key) {
 }
 
 // ── DB ───────────────────────────────────────────────────────────────────────
-require_once dirname(__DIR__) . '/../ttn_config.php';  // above web root
+require_once '/etc/ttn_config.php';
 
 try {
-    $dsn = "mysql:host={$ttn_db_host};dbname={$ttn_db_name};charset=utf8mb4";
+    $dsn = "mysql:unix_socket={$ttn_db_host};dbname={$ttn_db_name};charset=utf8mb4";
     $pdo = new PDO($dsn, $ttn_db_user, $ttn_db_pass, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -105,7 +105,7 @@ $portal = [
 
 // ── 3. ASL Servers ───────────────────────────────────────────────────────────
 $servers_raw = $pdo->query("
-    SELECT s.id, s.hostname, s.public_ip, s.asterisk_ip, s.ami_port, s.asl_port,
+    SELECT s.id, s.hostname, s.ip_address, s.asterisk_ip, s.ami_port, s.asl_port,
            s.asl_version, s.has_isp, s.ttn_logger_installed, s.ttn_status_installed,
            s.last_seen, s.is_active,
            si.name AS site_name
@@ -143,7 +143,7 @@ foreach ($servers_raw as $srv) {
         'id'               => (int)$srv['id'],
         'hostname'         => $srv['hostname'],
         'site_name'        => $srv['site_name'],
-        'public_ip'        => $srv['public_ip'] ?: null,
+        'public_ip'        => $srv['ip_address'] ?: null,
         'asterisk_ip'      => $srv['asterisk_ip'],
         'ami_port'         => (int)$srv['ami_port'],
         'asl_port'         => (int)$srv['asl_port'],
@@ -175,7 +175,8 @@ $nodes_raw = $pdo->query("
 $nodes = [];
 foreach ($nodes_raw as $n) {
     if ($n['is_active'] && !$n['server_hostname']) {
-        $flags[] = "NODE_NO_SERVER: ASL {$n['asl_number']} ({$n['callsign'] ?: 'no callsign'}) at {$n['site_name']} has no server record — telemetry POSTs will fail";
+        $callsign_display = $n['callsign'] ?: 'no callsign';
+        $flags[] = "NODE_NO_SERVER: ASL {$n['asl_number']} ({$callsign_display}) at {$n['site_name']} has no server record — telemetry POSTs will fail";
     }
     $nodes[] = [
         'id'             => (int)$n['id'],
@@ -211,7 +212,7 @@ foreach ($sites_raw as $s) {
 
 // ── 6. Systems ───────────────────────────────────────────────────────────────
 $systems_raw = $pdo->query("
-    SELECT sys.id, sys.callsign, sys.description, sys.status,
+    SELECT sys.id, sys.callsign, sys.label, sys.status,
            si.name AS site_name
     FROM systems sys
     LEFT JOIN sites si ON si.id = sys.site_id
@@ -223,7 +224,7 @@ foreach ($systems_raw as $sys) {
     $systems[] = [
         'id'          => (int)$sys['id'],
         'callsign'    => $sys['callsign'],
-        'description' => $sys['description'],
+        'description' => $sys['label'],
         'status'      => $sys['status'],
         'site_name'   => $sys['site_name'],
     ];
@@ -232,8 +233,8 @@ foreach ($systems_raw as $sys) {
 // ── 7. Telemetry — latest per system ─────────────────────────────────────────
 // sys_telemetry stores periodic logger POSTs. Stale telemetry = silent site.
 $telem_raw = $pdo->query("
-    SELECT t.system_id, t.recorded_at, t.online, t.connected_nodes, t.last_keyed,
-           sys.callsign, sys.description,
+    SELECT t.system_id, t.recorded_at, t.is_online, t.connected_nodes, t.last_keyed_at,
+           sys.callsign, sys.label,
            si.name AS site_name
     FROM sys_telemetry t
     JOIN (
@@ -259,20 +260,20 @@ foreach ($telem_raw as $t) {
     $telemetry[] = [
         'system_id'       => (int)$t['system_id'],
         'callsign'        => $t['callsign'],
-        'description'     => $t['description'],
+        'description'     => $t['label'],
         'site_name'       => $t['site_name'],
         'recorded_at'     => $t['recorded_at'],
         'recorded_sec'    => $age_sec,
-        'online'          => (bool)$t['online'],
+        'online'          => (bool)$t['is_online'],
         'connected_nodes' => (int)$t['connected_nodes'],
-        'last_keyed'      => $t['last_keyed'] ?: null,
+        'last_keyed'      => $t['last_keyed_at'] ?: null,
     ];
 }
 
 // ── 8. Connection log — recent events ────────────────────────────────────────
 $conn_raw = $pdo->query("
-    SELECT c.system_id, c.asl_node, c.direction, c.connected_at, c.disconnected_at,
-           c.remote_callsign,
+    SELECT c.system_id, c.connected_node, c.direction, c.connected_at, c.disconnected_at,
+           c.callsign,
            sys.callsign AS system_call,
            si.name AS site_name
     FROM conn_log c
@@ -287,8 +288,8 @@ foreach ($conn_raw as $c) {
     $conn_log[] = [
         'system_call'     => $c['system_call'],
         'site_name'       => $c['site_name'],
-        'asl_node'        => (int)$c['asl_node'],
-        'remote_callsign' => $c['remote_callsign'] ?: null,
+        'asl_node'        => (int)$c['connected_node'],
+        'remote_callsign' => $c['callsign'] ?: null,
         'direction'       => $c['direction'],
         'connected_at'    => $c['connected_at'],
         'disconnected_at' => $c['disconnected_at'] ?: null,
@@ -299,7 +300,7 @@ foreach ($conn_raw as $c) {
 $sera_raw = $pdo->query("
     SELECT s.id, s.trustee_call, s.status, s.coordinated_at,
            s.expires_at, s.recertified_at,
-           sys.callsign AS system_call, sys.description,
+           sys.callsign AS system_call, sys.label,
            si.name AS site_name
     FROM sera_records s
     LEFT JOIN systems sys ON sys.id = s.system_id
@@ -385,7 +386,7 @@ $update_brief_flags = [];
 $subnets = [];
 try {
     $subnets = $pdo->query("
-        SELECT id, name, cidr, vlan_id, description
+        SELECT id, subnet AS name, cidr, vlan_id, label AS description
         FROM network_subnets
         ORDER BY vlan_id
     ")->fetchAll();
@@ -406,9 +407,9 @@ try {
 
 // ── 13. Operators ────────────────────────────────────────────────────────────
 $operators_raw = $pdo->query("
-    SELECT id, callsign, role_level, created_at
+    SELECT id, callsign, role, created_at
     FROM operators
-    ORDER BY role_level DESC, callsign
+    ORDER BY role DESC, callsign
 ")->fetchAll();
 
 $role_map = [1 => 'viewer', 2 => 'operator', 3 => 'site_admin', 4 => 'admin'];
@@ -417,8 +418,8 @@ foreach ($operators_raw as $op) {
     $operators[] = [
         'id'         => (int)$op['id'],
         'callsign'   => $op['callsign'],
-        'role_level' => (int)$op['role_level'],
-        'role_name'  => $role_map[(int)$op['role_level']] ?? 'unknown',
+        'role_level' => $op['role'],
+        'role_name'  => $op['role'],
         'created_at' => $op['created_at'],
     ];
 }

@@ -17,13 +17,15 @@
  *   settings()      — load all settings into array
  */
 
-require_once '/home/obdswlpx/ttn_config.php';
+require_once '/etc/ttn_config.php';
 
 // ── PDO SINGLETON ─────────────────────────────────────────────
 function ttn_db(): PDO {
     static $pdo = null;
     if ($pdo === null) {
-        $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET;
+        $dsn = (strpos(DB_HOST, '/') === 0)
+            ? 'mysql:unix_socket=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET
+            : 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET;
         $pdo = new PDO($dsn, DB_USER, DB_PASS, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

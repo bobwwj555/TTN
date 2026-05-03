@@ -10,7 +10,7 @@
  * Usage: /api/node-status.php?node=65392
  */
 
-require_once '/home/obdswlpx/ttn_config.php';
+require_once '/etc/ttn_config.php';
 require_once TTN_INCLUDES . '/db.php';
 
 header('Content-Type: application/json');

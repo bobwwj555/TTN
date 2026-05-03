@@ -1,5 +1,5 @@
 <?php
-require_once '/home/obdswlpx/ttn_config.php';
+require_once '/etc/ttn_config.php';
 require_once TTN_INCLUDES . '/db.php';
 require_once TTN_INCLUDES . '/auth.php';
 ttn_require_role('admin');
