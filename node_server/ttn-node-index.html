@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W4BWW TN-HUB · Piedmont Node · TTN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Oxanium:wght@200;300;400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://dev.ttn.radio/ttn.css">
+<style>
+.node-hero{min-height:100vh;padding-top:46px;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.node-hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 30%,rgba(255,171,0,0.03) 0%,transparent 60%),radial-gradient(ellipse 40% 40% at 20% 70%,rgba(0,230,118,0.03) 0%,transparent 60%)}
+.node-hero-grid{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:0.5}
+.node-main{display:grid;grid-template-columns:1fr 1fr;align-items:start;padding:3rem 5vw 2rem;position:relative;z-index:2;gap:2rem;flex:1}
+.node-id{font-family:var(--mono);font-size:0.65rem;color:var(--amber);letter-spacing:0.25em;text-transform:uppercase;margin-bottom:1rem;display:flex;align-items:center;gap:0.7rem}
+.node-id::before{content:'';display:block;width:24px;height:1px;background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.node-title{font-family:var(--display);font-weight:800;font-size:clamp(2.4rem,4.5vw,4rem);line-height:0.95;text-transform:uppercase;color:var(--t1);margin-bottom:0.5rem}
+.node-title .a{color:var(--amber);display:block;text-shadow:0 0 30px rgba(255,171,0,0.2)}
+.node-title .sub{font-weight:200;font-size:0.4em;letter-spacing:0.2em;color:var(--t3);display:block;margin-top:0.5em}
+.node-desc{font-size:0.88rem;line-height:1.7;color:var(--t2);max-width:440px;margin:1.2rem 0 2rem}
+.iface-panel{background:var(--panel);border:1px solid var(--border2);font-family:var(--mono);margin-bottom:1.5rem}
+.iface-hd{background:var(--panel2);border-bottom:1px solid var(--border2);padding:0.5rem 1rem;font-size:0.6rem;letter-spacing:0.15em;color:var(--t3);text-transform:uppercase;display:flex;justify-content:space-between}
+.iface-hd .g{color:var(--green)}
+.iface-row{display:flex;align-items:center;padding:0.7rem 1rem;border-bottom:1px solid var(--border);transition:background 0.15s;text-decoration:none;gap:1rem}
+.iface-row:hover{background:var(--gglow)}
+.iface-row:last-child{border-bottom:none}
+.iface-name{font-size:0.8rem;color:var(--t1);flex:1;letter-spacing:0.05em}
+.iface-desc{font-size:0.6rem;color:var(--t3);letter-spacing:0.08em;text-transform:uppercase}
+.iface-arr{color:var(--green);font-size:0.8rem}
+.media-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border2);border:1px solid var(--border2);margin-top:1.5rem}
+.media-card{background:var(--panel);padding:0}
+.media-card img{width:100%;height:200px;object-fit:cover;display:block;filter:brightness(0.85) saturate(0.7)}
+.media-card-label{background:var(--panel2);padding:0.5rem 0.8rem;font-family:var(--mono);font-size:0.58rem;color:var(--t3);letter-spacing:0.1em;text-transform:uppercase;border-top:1px solid var(--border2)}
+.specs{background:var(--panel);border:1px solid var(--border2);font-family:var(--mono)}
+.spec-row{display:grid;grid-template-columns:140px 1fr;padding:0.5rem 1rem;border-bottom:1px solid var(--border);font-size:0.68rem}
+.spec-row:last-child{border-bottom:none}
+.spec-k{color:var(--t3);letter-spacing:0.08em;text-transform:uppercase;font-size:0.6rem}
+.spec-v{color:var(--t1)}
+.spec-v.g{color:var(--green)}
+.spec-v.a{color:var(--amber)}
+.live-section{background:var(--bg2);border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);padding:3rem 5vw}
+.connected-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border2);border:1px solid var(--border2)}
+.conn-row{background:var(--panel);padding:0.7rem 1rem;display:flex;align-items:center;gap:0.8rem;font-family:var(--mono);transition:background 0.15s}
+.conn-row:hover{background:var(--panel2)}
+.conn-node{color:var(--amber);font-size:0.75rem;min-width:65px}
+.conn-call{color:var(--t1);font-size:0.72rem;flex:1}
+.conn-state{font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--green)}
+.conn-empty{background:var(--panel);padding:1.2rem 1rem;font-family:var(--mono);font-size:0.65rem;color:var(--t3);font-style:italic;grid-column:1/-1;text-align:center}
+.live-banner{background:var(--gglow);border:1px solid var(--gdim);padding:0.4rem 1rem;font-family:var(--mono);font-size:0.6rem;color:var(--green);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center}
+.live-banner.loading{color:var(--t3);background:transparent;border-color:var(--border2)}
+.live-banner.error{color:var(--red);background:rgba(255,23,68,0.04);border-color:rgba(255,23,68,0.2)}
+.live-banner .rb{cursor:pointer;border:1px solid var(--border2);padding:0.1rem 0.5rem;font-size:0.57rem;transition:all 0.15s}
+.live-banner .rb:hover{color:var(--green);border-color:var(--gdim)}
+@media(max-width:800px){
+  .node-main{grid-template-columns:1fr;padding:2rem 1.5rem}
+  .media-grid,.connected-grid{grid-template-columns:1fr}
+  .live-section{padding:2rem 1.5rem}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="tb">
+  <div class="tb-logo" id="ttnLogo" title="W4BWW DE TTN"><span class="tb-dot"></span>TTN</div>
+  <nav class="tb-nav">
+    <a href="https://ttn.radio" target="_blank">TTN Home</a>
+    <a href="#interfaces">Interfaces</a>
+    <a href="#live">Live Nodes</a>
+    <a href="#specs">Node Specs</a>
+    <a href="https://ttn.radio/donate/" target="_blank">Donate</a>
+  </nav>
+  <div class="tb-right">
+    <div class="tb-tag"><span id="liveCount">— CONNECTED</span>NODE <span id="hdrNode"></span></div>
+    <div class="tb-freq" id="hdrFreq"></div>
+  </div>
+</header>
+
+<!-- NODE HERO -->
+<section class="node-hero">
+  <div class="node-hero-bg"></div>
+  <div class="node-hero-grid"></div>
+  <div class="node-main">
+    <div>
+      <div class="node-id" id="heroId"></div>
+      <div class="node-title" id="heroTitle"></div>
+      <p class="node-desc" id="heroDesc"></p>
+
+      <!-- INTERFACE LINKS -->
+      <div class="iface-panel" id="interfaces">
+        <div class="iface-hd"><span class="g">◉ NODE INTERFACES</span><span id="ifaceHost"></span></div>
+        <div id="ifaceLinks"></div>
+      </div>
+    </div>
+
+    <div>
+      <!-- NODE SPECS -->
+      <div class="specs" id="specs">
+        <div class="iface-hd"><span>NODE SPECIFICATIONS</span><span style="color:var(--green)" id="specsTitle"></span></div>
+        <div id="specRows"></div>
+      </div>
+
+      <!-- IMAGES -->
+      <div class="media-grid" id="mediaGrid"></div>
+    </div>
+  </div>
+
+  <!-- TICKER -->
+  <div class="ticker">
+    <div class="tick-lbl" id="tickLabel"></div>
+    <div class="tick-scroll"><div class="tick-inner" id="tickInner"></div></div>
+  </div>
+</section>
+
+<!-- LIVE CONNECTED NODES -->
+<section class="live-section" id="live">
+  <div class="sec-label">Live</div>
+  <h2>Connected Nodes</h2>
+  <div class="live-banner loading" id="liveBanner">
+    <span id="liveBannerText">⟳ POLLING NODE SERVER...</span>
+    <span class="rb" onclick="fetchNodeStatus()">↻ REFRESH</span>
+  </div>
+  <div class="connected-grid" id="connectedGrid">
+    <div class="conn-empty">Loading live data...</div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span id="footerMain"></span>
+  <span id="footerContact"></span>
+  <span>
+    <a href="https://ttn.radio" target="_blank">TTN Home</a> ·
+    <a href="https://www.facebook.com/groups/867375109631931" target="_blank">Facebook</a> ·
+    <a href="https://ttn.radio/donate/" target="_blank">Donate</a>
+  </span>
+</footer>
+
+<div class="cw-toast" id="cwToast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// TTN NODE PAGE CONFIG
+// To deploy on a new server — edit ONLY this block.
+// Everything else is automatic.
+// ══════════════════════════════════════════════════════════════
+const NODE_CONFIG = {
+    // Identity
+    callsign:    'W4BWW',
+    hub_name:    'TN-HUB',
+    location:    'New Market, TN',
+    coords:      '36.027°N 83.535°W',
+    description: 'The primary AllStarLink hub for the Tennessee Technological Community. 6m repeater backbone, 440MHz RF failover, solar primary power. Node interfaces below — login required for system management.',
+
+    // Primary node for status polling
+    hub_node:    '450330',
+    hub_freq:    '53.870',
+
+    // This server's hostname
+    hostname:    'tn.w4bww.net',
+
+    // Status proxy — always ttn-status.php on THIS server (local AMI)
+    status_url:  '/ttn-status.php',
+
+    // Node specs table — add/remove rows as needed
+    specs: [
+        ['Location',     'New Market, TN · 36.027°N 83.535°W',          ''],
+        ['Hub Node',     'AllStar 450330',                                'a'],
+        ['6m Repeater',  '53.870 / 52.870 · PL 118.8 · ASL 450333',     ''],
+        ['440 Repeater', '440.400+ · D125N · ASL 450330',                ''],
+        ['10m Repeater', '29.620- · PL 118.8 · ASL 450332',             ''],
+        ['Remote Base',  '145.510 · PL 118.8 · ASL 450331',             ''],
+        ['EchoLink',     'W4BWW 535789 · W4BWW-L 995754 · W4BWW-R 358104',''],
+        ['Tower',        '120ft Rohn 25 · 360W ERP',                     ''],
+        ['Power',        'Solar Primary · 48V Battery Backup',           'g'],
+        ['Trustee',      'Bobby Whitaker · W4BWW · GROL',                ''],
+        ['Network',      'TTN · HUB.TTN.RADIO · ttn.radio',             'g'],
+    ],
+
+    // Interface links — add/remove as needed
+    // [label, url, description]
+    interfaces: [
+        ['ALLSCAN',    'https://tn.w4bww.net/allscan',              'Primary node interface · Recommended'],
+        ['SUPERMON',   'https://tn.w4bww.net/supermon',             'Node monitoring · Status overview'],
+        ['ALLMON3',    'https://tn.w4bww.net/allmon3',              'AllStarLink monitor · Node list'],
+        ['QRZ · W4BWW','https://www.qrz.com/db/W4BWW',             'Callsign page · Full node list'],
+        ['TTN.RADIO',  'https://ttn.radio',                         'Main network page · All sites'],
+    ],
+
+    // Ticker items — shown in scrolling bar
+    ticker: [
+        '53.870/52.870 · PL 118.8 · AllStar 450333 · EchoLink W4BWW-L 995754',
+        '440.400+ · ASL 450330',
+        '29.620- · ASL 450332',
+        '145.510 RB · ASL 450331',
+        'TTN · TENNESSEE TECHNOLOGICAL COMMUNITY · ttn.radio',
+        'PIEDMONT HUB · NEW MARKET TN · 120FT ROHN 25 · SOLAR PRIMARY',
+    ],
+
+    // Images — [url, label] — leave empty array [] to hide
+    images: [
+        ['https://tn.w4bww.net/images/TN_Cov_w4bww.png', 'Coverage Estimate · TN'],
+        ['https://tn.w4bww.net/images/TNTower.jpg',       'Tower Photo'],
+    ],
+
+    // Footer
+    footer_main:    'W4BWW · Piedmont Hub · TTN Tennessee Technological Community · EIN 41-2680033',
+    footer_contact: 'ttn.radio · bobwwj555@gmail.com · 865-202-6696',
+
+    // CW easter egg text
+    cw_text: 'W4BWW DE TTN 73',
+};
+// ══════════════════════════════════════════════════════════════
+// END CONFIG — do not edit below this line
+// ══════════════════════════════════════════════════════════════
+
+// ── RENDER PAGE FROM CONFIG ───────────────────────────────────
+(function() {
+    const c = NODE_CONFIG;
+
+    document.title = `${c.callsign} ${c.hub_name} · ${c.location} · TTN`;
+
+    document.getElementById('hdrNode').textContent  = c.hub_node;
+    document.getElementById('hdrFreq').textContent  = c.hub_freq;
+    document.getElementById('heroId').textContent   = `${c.callsign} · ${c.hub_name} · ${c.location} · AllStar ${c.hub_node}`;
+    document.getElementById('heroTitle').innerHTML  = `${c.hub_name}<span class="a">${c.callsign}</span><span class="sub">Tennessee Technological Community · TTN ${c.hub_name}</span>`;
+    document.getElementById('heroDesc').textContent = c.description;
+    document.getElementById('ifaceHost').textContent = c.hostname.toUpperCase();
+    document.getElementById('specsTitle').textContent = `${c.callsign} ${c.hub_name}`;
+    document.getElementById('tickLabel').textContent  = `${c.callsign} HUB`;
+    document.getElementById('cwToast').textContent    = `▶ CW · ${c.cw_text}`;
+    document.getElementById('footerMain').textContent    = c.footer_main;
+    document.getElementById('footerContact').textContent = c.footer_contact;
+
+    // Interface links
+    document.getElementById('ifaceLinks').innerHTML = c.interfaces.map(([name, url, desc]) =>
+        `<a href="${url}" class="iface-row" target="_blank">
+            <span class="iface-name">${name}</span>
+            <span class="iface-desc">${desc}</span>
+            <span class="iface-arr">›</span>
+        </a>`
+    ).join('');
+
+    // Spec rows
+    document.getElementById('specRows').innerHTML = c.specs.map(([k, v, cls]) =>
+        `<div class="spec-row"><span class="spec-k">${k}</span><span class="spec-v ${cls}">${v}</span></div>`
+    ).join('');
+
+    // Images
+    if (c.images.length) {
+        document.getElementById('mediaGrid').innerHTML = c.images.map(([url, label]) =>
+            `<div class="media-card">
+                <img src="${url}" alt="${label}" loading="lazy">
+                <div class="media-card-label">${label}</div>
+            </div>`
+        ).join('');
+    } else {
+        document.getElementById('mediaGrid').style.display = 'none';
+    }
+
+    // Ticker — duplicate for seamless loop
+    const items = c.ticker.map((t,i) =>
+        `<span class="${i===0||i===c.ticker.length-1?'hi':''}">${t}</span><span class="sep">|</span>`
+    ).join('');
+    document.getElementById('tickInner').innerHTML = items + items;
+})();
+
+// ── NODE STATUS POLLING ───────────────────────────────────────
+async function fetchNodeStatus() {
+    const banner     = document.getElementById('liveBanner');
+    const bannerText = document.getElementById('liveBannerText');
+    const grid       = document.getElementById('connectedGrid');
+    const liveCount  = document.getElementById('liveCount');
+
+    banner.className = 'live-banner loading';
+    bannerText.textContent = '⟳ POLLING NODE SERVER...';
+
+    try {
+        const res = await fetch(`${NODE_CONFIG.status_url}?node=${NODE_CONFIG.hub_node}`, {
+            signal: AbortSignal.timeout(20000)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Node error');
+
+        const count = data.conn_count ?? 0;
+        liveCount.textContent = `${count} CONNECTED`;
+        banner.className = 'live-banner';
+        bannerText.textContent = `◉ NODE ${NODE_CONFIG.hub_node} ONLINE · ${count} CONNECTED · ${new Date().toLocaleTimeString()}`;
+
+        const conns = data.connections || [];
+        grid.innerHTML = conns.length
+            ? conns.map(n =>
+                `<div class="conn-row">
+                    <span class="conn-node">${n.node}</span>
+                    <span class="conn-call">${n.callsign || ''}</span>
+                    <span class="conn-state">${n.direction || 'CONNECTED'}</span>
+                </div>`
+              ).join('')
+            : `<div class="conn-empty">Hub online · No active connections right now · AllStar ${NODE_CONFIG.hub_node}</div>`;
+
+    } catch(e) {
+        banner.className = 'live-banner error';
+        bannerText.textContent = `✕ LIVE DATA UNAVAILABLE · ${new Date().toLocaleTimeString()}`;
+        grid.innerHTML = `<div class="conn-empty" style="color:var(--t3)">Connect: AllStar ${NODE_CONFIG.hub_node}</div>`;
+    }
+}
+
+fetchNodeStatus();
+setInterval(fetchNodeStatus, 60000);
+
+// ── CW EASTER EGG ─────────────────────────────────────────────
+const CW = {
+    A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',
+    I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',
+    Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',
+    Y:'-.--',Z:'--..',7:'--...',3:'...--',' ':' '
+};
+
+function playCW(text) {
+    try {
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const WPM = 18, dit = 1.2/WPM;
+        let t = ctx.currentTime + 0.05;
+        const tone = dur => {
+            const o=ctx.createOscillator(), g=ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value=700; o.type='sine';
+            g.gain.setValueAtTime(0,t);
+            g.gain.linearRampToValueAtTime(0.25,t+0.006);
+            g.gain.setValueAtTime(0.25,t+dur-0.006);
+            g.gain.linearRampToValueAtTime(0,t+dur);
+            o.start(t); o.stop(t+dur); t+=dur;
+        };
+        text.toUpperCase().split('').forEach(ch => {
+            if(ch===' '){t+=dit*7;return;}
+            const code=CW[ch]; if(!code)return;
+            code.split('').forEach(s=>{s==='.'?tone(dit):tone(dit*3);t+=dit;});
+            t+=dit*2;
+        });
+    } catch(e){}
+}
+
+let cwCooldown = false;
+document.getElementById('ttnLogo').addEventListener('click', e => {
+    e.preventDefault();
+    if(cwCooldown) return;
+    cwCooldown = true;
+    setTimeout(()=>cwCooldown=false, 12000);
+    const toast = document.getElementById('cwToast');
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 4500);
+    playCW(NODE_CONFIG.cw_text);
+});
+</script>
+</body>
+</html>
