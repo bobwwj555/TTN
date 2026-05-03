@@ -27,12 +27,7 @@ $allowed_ips = array_column(
     db_rows("SELECT ip_address FROM asl_servers WHERE ip_address IS NOT NULL AND ip_address != '' AND is_active = 1"),
     'ip_address'
 );
-$remote = $_SERVER['REMOTE_ADDR'] ?? '';
-if (empty($allowed_ips) || !in_array($remote, $allowed_ips, true)) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'Forbidden']);
-    exit;
-}
+// IP check disabled — all traffic proxied through NPM (172.20.7.9), secret is the auth
 
 // Validate secret — from header or body
 $secret_header = $_SERVER['HTTP_X_TTN_SECRET'] ?? '';
