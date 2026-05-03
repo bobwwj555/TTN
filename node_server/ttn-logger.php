@@ -4,7 +4,7 @@
  * LOCATION: /var/www/html/ttn-logger.php  (on tn.w4bww.net)
  *
  * Run via cron every minute (as www-data):
- *   * * * * * /usr/bin/php /var/www/html/ttn-logger.php >> /var/log/ttn-logger.log 2>&1
+ *   */5 * * * * /usr/bin/php /var/www/html/ttn-logger.php >> /var/log/ttn-logger.log 2>&1
  *
  * ASL3 AMI commands used:
  *   ACTION: RptStatus / COMMAND: XStat   — connections, keyed state, direction
