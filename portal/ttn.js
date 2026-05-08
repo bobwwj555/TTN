@@ -118,6 +118,6 @@ async function pollNodeStatus(node) {
 
 // Poll on load and every 60 seconds
 document.addEventListener('DOMContentLoaded', () => {
-  pollNodeStatus();
-  setInterval(pollNodeStatus, 60000);
+  pollNodeStatus(TTN_HUB_NODE);
+  setInterval(() => pollNodeStatus(TTN_HUB_NODE), 60000);
 });

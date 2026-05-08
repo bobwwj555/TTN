@@ -44,7 +44,7 @@ try {
         SELECT is_online, last_keyed_at, connected_nodes, recorded_at
         FROM sys_telemetry
         WHERE system_id = ?
-        ORDER BY recorded_at DESC
+        ORDER BY recorded_at DESC, connected_nodes DESC
         LIMIT 1
     ", [$sys['id']]);
 } catch (Exception $e) {}
@@ -78,7 +78,7 @@ echo json_encode([
     'node'          => $node,
     'callsign'      => $sys['callsign'],
     'is_online'     => $is_online,
-    'conn_count'    => count($active),
+    'conn_count'    => (int)($telem['connected_nodes'] ?? 0),
     'connections'   => $active,
     'last_keyed_at' => $last_keyed,
     'data_age_sec'  => $data_age,
