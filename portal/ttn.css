@@ -231,3 +231,24 @@ footer a:hover{color:var(--green)}
   .sites-tbl{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
   .ticker{overflow:hidden;max-width:100vw}
 }
+
+/* ── BUG FIXES: typewriter, heading overflow, hamburger clipping ── */
+
+/* Bug 1 — typewriter: ensure h1 container doesn't clip animated text */
+.hero-h1{overflow:visible;white-space:normal}
+.hero-h1 em{display:inline-block;min-width:2ch}
+
+/* Bug 2 — section headings overflow on mobile */
+@media(max-width:768px){
+  h1,h2{overflow-wrap:break-word;word-break:break-word;hyphens:auto;max-width:100%}
+  section{overflow-x:hidden}
+  .hero{overflow-x:hidden}
+  body{overflow-x:hidden}
+}
+
+/* Bug 3 — hamburger X clipped: hide tb-right on mobile, more padding on header */
+@media(max-width:768px){
+  .tb-right{display:none}
+  .tb{padding:0 1rem}
+  .tb-menu-btn{margin-right:0.75rem}
+}
