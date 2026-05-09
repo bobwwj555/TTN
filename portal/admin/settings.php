@@ -73,6 +73,7 @@ $setting_groups = [
     'org'    => ['org_name','org_callsign','org_ein','org_nonprofit','org_state'],
     'contact'=> ['contact_name','contact_email','contact_phone','contact_address'],
     'social' => ['social_facebook','social_github','paypal_url'],
+    'mail'   => ['mail_enabled','mail_host','mail_port','mail_user','mail_pass','mail_from','mail_from_name'],
     'images' => ['img_logo','img_logo_full','img_hero','img_hero_bg','img_coverage'],
 ];
 
