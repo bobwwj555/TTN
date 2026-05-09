@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($_FILES['photo_file']['name']) && $_FILES['photo_file']['error'] === UPLOAD_ERR_OK) {
                 $allowed = ['image/jpeg','image/png','image/gif','image/webp'];
                 $op_call = db_row("SELECT callsign FROM operators WHERE id=?", [$pid]);
-                if (in_array($_FILES['photo_file']['type'], $allowed) && $_FILES['photo_file']['size'] < 3*1024*1024) {
+                if (in_array($_FILES['photo_file']['type'], $allowed) && $_FILES["photo_file"]["size"] < 8*1024*1024) {
                     $ext   = strtolower(pathinfo($_FILES['photo_file']['name'], PATHINFO_EXTENSION));
                     $fname = 'op_' . strtolower(preg_replace('/[^a-z0-9]/','', $op_call['callsign'] ?? 'op')) . '_' . time() . '.' . $ext;
                     if (move_uploaded_file($_FILES['photo_file']['tmp_name'], '/home/obdswlpx/dev.ttn.radio/assets/img/'.$fname))
