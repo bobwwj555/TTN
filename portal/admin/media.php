@@ -8,8 +8,8 @@ $adm_title = 'Media Library';
 $adm_page  = 'media';
 $msg = $err = '';
 
-$upload_dir      = '/home/obdswlpx/dev.ttn.radio/assets/img/';
-$upload_url_base = s('site_url','https://dev.ttn.radio') . '/assets/img/';
+$upload_dir      = '/var/www/html/uploads/';
+$upload_url_base = s('site_url','https://dev.ttn.radio') . '/uploads/';
 $allowed_ext     = ['jpg','jpeg','png','gif','webp','svg'];
 $allowed_types   = ['image/jpeg','image/png','image/gif','image/webp','image/svg+xml'];
 $max_size        = 8 * 1024 * 1024; // 8MB
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $setting_key = preg_replace('/[^a-z0-9_]/', '', $_POST['setting_key'] ?? '');
         $fname       = basename($_POST['filename'] ?? '');
         if ($setting_key && $fname) {
-            $url = '/assets/img/' . $fname;
+            $url = '/uploads/' . $fname;
             db_execute("INSERT INTO site_settings (setting_key, setting_val) VALUES (?,?)
                         ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val)",
                 [$setting_key, $url]);
@@ -119,7 +119,7 @@ if (is_dir($upload_dir)) {
         if (!in_array($ext, $allowed_ext) || !is_file($fp)) continue;
         $files[] = [
             'name'     => $f,
-            'url'      => '/assets/img/' . $f,
+            'url'      => '/uploads/' . $f,
             'size'     => filesize($fp),
             'modified' => filemtime($fp),
             'ext'      => $ext,
