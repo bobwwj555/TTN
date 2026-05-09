@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'band'        => trim($_POST['band']        ?? '') ?: null,
                 'access_type' => trim($_POST['access_type'] ?? 'CTCSS'),
                 'access_code' => trim($_POST['access_code'] ?? '') ?: null,
-                'sort_order'  => (int)($_POST['sort_order'] ?? 0),
+                'sort_order'  => (int)(db_value("SELECT COALESCE(MAX(sort_order)+1,0) FROM systems WHERE site_id=?", [$sid]) ?? 0),
                 'is_public'   => isset($_POST['sys_is_public']) ? 1 : 0,
             ]);
             // Seed FM mode by default
