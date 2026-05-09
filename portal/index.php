@@ -55,7 +55,7 @@ try {
         JOIN systems s  ON s.id  = st.system_id
         JOIN sys_asl sa ON sa.system_id = s.id
         WHERE sa.asl_number = ?
-        ORDER BY st.recorded_at DESC, st.connected_nodes DESC
+        ORDER BY st.recorded_at DESC, st.connected_nodes DESC, st.id DESC
         LIMIT 1
     ", [$hub_node]);
     if ($row) {
