@@ -121,3 +121,35 @@ document.addEventListener('DOMContentLoaded', () => {
   pollNodeStatus(TTN_HUB_NODE);
   setInterval(() => pollNodeStatus(TTN_HUB_NODE), 60000);
 });
+
+// ── MOBILE NAV HAMBURGER ──────────────────────────────────────────────────────
+// Appended to ttn.js — handles .tb-menu-btn toggle of .tb-nav-mobile
+document.addEventListener('DOMContentLoaded', () => {
+  const btn     = document.getElementById('tb-menu-btn');
+  const mobileNav = document.getElementById('tb-nav-mobile');
+  if (!btn || !mobileNav) return;
+
+  btn.addEventListener('click', () => {
+    const open = mobileNav.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open);
+    btn.textContent = open ? '✕' : '☰';
+  });
+
+  // Close mobile nav when a link is clicked
+  mobileNav.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      mobileNav.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.textContent = '☰';
+    });
+  });
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!btn.contains(e.target) && !mobileNav.contains(e.target)) {
+      mobileNav.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.textContent = '☰';
+    }
+  });
+});

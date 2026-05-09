@@ -1,13 +1,12 @@
 <?php
 /**
  * TTN Shared Header
- * LOCATION: /home/obdswlpx/dev.ttn.radio/includes/header.php
+ * LOCATION: /var/www/html/includes/header.php
  */
 require_once '/etc/ttn_config.php';
 require_once TTN_INCLUDES . '/db.php';
 require_once TTN_INCLUDES . '/auth.php';
 ttn_session_start();
-
 $_site_url    = s('site_url',    'https://dev.ttn.radio');
 $_hub_url     = s('hub_url',     'https://hub.ttn.radio');
 $_hub_node    = s('hub_node',    '65392');
@@ -16,17 +15,15 @@ $_allscan_url = $_hub_url . '/allscan';
 $_org_call    = s('org_callsign','W4BWW');
 $_img_logo    = s('img_logo',    '/assets/img/Diamond_and_Small_Coil.jpeg');
 $_meta_desc   = s('meta_description', 'TTN — volunteer-built RF network for technical hams.');
-
 $_nav = [
-    ['Network',  $_site_url . '/#network'],
-    ['Sites',    $_site_url . '/sites/'],
-    ['Team',     $_site_url . '/team/'],
-    ['Roadmap',  $_site_url . '/roadmap/'],
-    ['Docs',     $_site_url . '/docs/'],
-    ['AllScan',  $_allscan_url, '_blank'],
-    ['Donate',   $_site_url . '/donate/'],
+    ['Network',      $_site_url . '/#network'],
+    ['Sites',        $_site_url . '/sites/'],
+    ['Team',         $_site_url . '/team/'],
+    ['Roadmap',      $_site_url . '/roadmap/'],
+    ['Docs',         $_site_url . '/docs/'],
+    ['Node Monitor', $_allscan_url, '_blank'],
+    ['Donate',       $_site_url . '/donate/'],
 ];
-
 $page_title = $page_title ?? 'TTN';
 ?>
 <!DOCTYPE html>
@@ -43,20 +40,19 @@ $page_title = $page_title ?? 'TTN';
 <?php if (!empty($extra_head)) echo $extra_head; ?>
 </head>
 <body>
-
 <div class="cw-toast" id="cwToast">▶ CW · <?= htmlspecialchars($_org_call) ?> DE TTN ···- ·-· ···</div>
-
 <header class="tb">
     <a href="<?= $_site_url ?>/" class="tb-logo" id="ttnLogo" title="<?= htmlspecialchars($_org_call) ?> DE TTN">
         <?php if ($_img_logo): ?>
         <img src="<?= htmlspecialchars($_img_logo) ?>" alt="TTN" style="height:30px;width:30px;object-fit:contain;vertical-align:middle;margin-right:0.5rem;border-radius:2px">
         <?php endif; ?>TTN
     </a>
-    <nav class="tb-nav">
+    <nav class="tb-nav" aria-label="Main navigation">
         <?php foreach ($_nav as $item): ?>
         <a href="<?= htmlspecialchars($item[1]) ?>"<?= isset($item[2]) ? ' target="'.$item[2].'"' : '' ?>><?= $item[0] ?></a>
         <?php endforeach; ?>
     </nav>
+    <button class="tb-menu-btn" id="tb-menu-btn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="tb-nav-mobile">☰</button>
     <div class="tb-right">
         <div class="tb-tag">
             <span id="hdr-conn">— NODES</span>
@@ -66,7 +62,11 @@ $page_title = $page_title ?? 'TTN';
         <a href="<?= $_site_url ?>/admin/login.php" class="tb-admin-link" title="Operator Login">⚙</a>
     </div>
 </header>
-
+<nav class="tb-nav-mobile" id="tb-nav-mobile" aria-label="Mobile navigation">
+    <?php foreach ($_nav as $item): ?>
+    <a href="<?= htmlspecialchars($item[1]) ?>"<?= isset($item[2]) ? ' target="'.$item[2].'"' : '' ?>><?= $item[0] ?></a>
+    <?php endforeach; ?>
+</nav>
 <script>
 const TTN_STATUS_URL = '<?= s('ami_proxy_url','https://tn.w4bww.net/ttn-status.php') ?>';
 const TTN_HUB_NODE   = '<?= htmlspecialchars($_hub_node) ?>';
