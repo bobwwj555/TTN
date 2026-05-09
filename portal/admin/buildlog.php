@@ -97,7 +97,7 @@ $entries = db_rows("
 ", $where_params);
 
 $all_sites = db_rows("SELECT id, name FROM sites ORDER BY name");
-$entry_types = ['update','install','repair','survey','planning','milestone','other'];
+$entry_types = ['infrastructure','security','milestone','site_deployment','grant','update','install','repair','survey','planning','other'];
 $site_url = s('site_url', 'https://dev.ttn.radio');
 
 require_once TTN_INCLUDES . '/admin_head.php';
