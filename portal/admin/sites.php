@@ -61,13 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Handle site photo upload
             $photo_url = trim($_POST['photo_url'] ?? '') ?: null;
             if (!empty($_FILES['site_photo']['name']) && $_FILES['site_photo']['error'] === UPLOAD_ERR_OK) {
-                $upload_dir = '/home/obdswlpx/dev.ttn.radio/assets/img/';
+                $upload_dir = '/var/www/html/uploads/';
                 $allowed    = ['image/jpeg','image/png','image/webp'];
                 if (in_array($_FILES['site_photo']['type'], $allowed) && $_FILES['site_photo']['size'] < 5*1024*1024) {
                     $ext   = strtolower(pathinfo($_FILES['site_photo']['name'], PATHINFO_EXTENSION));
                     $fname = 'site_' . preg_replace('/[^a-z0-9]/','', strtolower($_POST['site_name_slug'] ?? 'site')) . '_' . time() . '.' . $ext;
                     if (move_uploaded_file($_FILES['site_photo']['tmp_name'], $upload_dir . $fname)) {
-                        $photo_url = '/assets/img/' . $fname;
+                        $photo_url = '/uploads/' . $fname;
                     }
                 }
             }
@@ -142,13 +142,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Handle system photo upload
             $photo_url = trim($_POST['sys_photo_url'] ?? '') ?: null;
             if (!empty($_FILES['sys_photo']['name']) && $_FILES['sys_photo']['error'] === UPLOAD_ERR_OK) {
-                $upload_dir = '/home/obdswlpx/dev.ttn.radio/assets/img/';
+                $upload_dir = '/var/www/html/uploads/';
                 $allowed    = ['image/jpeg','image/png','image/webp'];
                 if (in_array($_FILES['sys_photo']['type'], $allowed) && $_FILES['sys_photo']['size'] < 5*1024*1024) {
                     $ext   = strtolower(pathinfo($_FILES['sys_photo']['name'], PATHINFO_EXTENSION));
                     $fname = 'sys_' . preg_replace('/[^a-z0-9]/','', strtolower($_POST['sys_callsign_slug'] ?? 'sys')) . '_' . time() . '.' . $ext;
                     if (move_uploaded_file($_FILES['sys_photo']['tmp_name'], $upload_dir . $fname)) {
-                        $photo_url = '/assets/img/' . $fname;
+                        $photo_url = '/uploads/' . $fname;
                     }
                 }
             }

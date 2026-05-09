@@ -46,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $ext     = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                 $fname   = $setting_key . '_' . time() . '.' . $ext;
-                $dest    = '/home/obdswlpx/dev.ttn.radio/assets/img/' . $fname;
-                $new_url = '/assets/img/' . $fname;
+                $dest    = '/var/www/html/uploads/' . $fname;
+                $new_url = '/uploads/' . $fname;
                 if (!is_dir(dirname($dest))) mkdir(dirname($dest), 0755, true);
                 if (move_uploaded_file($file['tmp_name'], $dest)) {
                     // key FIRST, value SECOND
