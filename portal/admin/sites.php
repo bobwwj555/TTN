@@ -103,6 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sid,
             ]);
             $msg = 'Site updated.'; $action = 'edit'; $edit_id = $sid;
+            require_once TTN_INCLUDES . '/node-refresh.php'; ttn_node_refresh($sid);
         }
     }
 
@@ -337,6 +338,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     db_insert('sys_interfaces', $data);
                 }
                 $msg = 'Interface saved.'; $action = 'edit'; $edit_id = $sys['site_id'];
+                require_once TTN_INCLUDES . '/node-refresh.php'; ttn_node_refresh($sys['site_id']);
             }
         }
     }
