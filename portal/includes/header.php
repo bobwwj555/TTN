@@ -21,7 +21,7 @@ $_nav = [
     ['Team',         $_site_url . '/team/'],
     ['Roadmap',      $_site_url . '/roadmap/'],
     ['Docs',         $_site_url . '/docs/'],
-    ['Node Monitor', $_allscan_url, '_blank'],
+    ['AllScan', $_allscan_url, '_blank'],
     ['Donate',       $_site_url . '/donate/'],
 ];
 $page_title = $page_title ?? 'TTN';
