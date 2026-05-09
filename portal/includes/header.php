@@ -16,7 +16,7 @@ $_org_call    = s('org_callsign','W4BWW');
 $_img_logo    = s('img_logo',    '/assets/img/Diamond_and_Small_Coil.jpeg');
 $_meta_desc   = s('meta_description', 'TTN — volunteer-built RF network for technical hams.');
 $_nav = [
-    ['Network',      $_site_url . '/#network'],
+    ['Network',      $_site_url . '/network/'],
     ['Sites',        $_site_url . '/sites/'],
     ['Team',         $_site_url . '/team/'],
     ['Roadmap',      $_site_url . '/roadmap/'],

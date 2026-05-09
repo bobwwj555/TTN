@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const toast = document.getElementById('cwToast');
 
   if (logo && toast) {
-    logo.addEventListener('click', (e) => {
+    logo.addEventListener('dblclick', (e) => {
       e.preventDefault();
       if (cwCooldown) return;
       cwCooldown = true;
