@@ -90,4 +90,11 @@ a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+<?php if (defined('TTN_ENV') && TTN_ENV === 'development'): ?>
+<div style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ffab00;color:#000;font-family:monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.15em;text-align:center;padding:0.25rem;text-transform:uppercase">
+⚠ DEVELOPMENT ENVIRONMENT — ttn_dev DB — NOT PRODUCTION
+</div>
+<style>body{margin-top:24px!important}</style>
+<?php endif; ?>
+
 <div class="adm-wrap">

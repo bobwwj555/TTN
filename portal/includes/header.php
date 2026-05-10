@@ -62,6 +62,12 @@ $page_title = $page_title ?? 'TTN';
         <a href="<?= $_site_url ?>/admin/login.php" class="tb-admin-link" title="Operator Login">⚙</a>
     </div>
 </header>
+
+<?php if (defined('TTN_ENV') && TTN_ENV === 'development'): ?>
+<div style="position:fixed;top:46px;left:0;right:0;z-index:498;background:#ffab00;color:#000;font-family:var(--mono);font-size:0.65rem;font-weight:700;letter-spacing:0.15em;text-align:center;padding:0.2rem;text-transform:uppercase">
+⚠ DEV ENVIRONMENT — ttn_dev DB — NOT PRODUCTION
+</div>
+<?php endif; ?>
 <nav class="tb-nav-mobile" id="tb-nav-mobile" aria-label="Mobile navigation">
     <?php foreach ($_nav as $item): ?>
     <a href="<?= htmlspecialchars($item[1]) ?>"<?= isset($item[2]) ? ' target="'.$item[2].'"' : '' ?>><?= $item[0] ?></a>
