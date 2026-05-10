@@ -65,6 +65,26 @@ try {
 	", [$sys['id']]);
 } catch (Exception $e) {}
 
+// Enrich with astdb cache
+$astdb = [];
+$astdb_file = '/var/cache/ttn-astdb.json';
+if (file_exists($astdb_file)) {
+    $astdb = json_decode(file_get_contents($astdb_file), true) ?? [];
+}
+foreach ($active as &$conn) {
+    $anode = $conn['node'];
+    if (empty($conn['callsign']) && isset($astdb[$anode])) {
+        $conn['callsign'] = $astdb[$anode]['callsign'] ?? '';
+    }
+    if (empty($conn['location']) && isset($astdb[$anode])) {
+        $conn['location'] = $astdb[$anode]['location'] ?? '';
+        if (!empty($astdb[$anode]['info'])) {
+            $conn['info'] = $astdb[$anode]['info'];
+        }
+    }
+}
+unset($conn);
+
 // Last heard — most recent conn_log entry if telemetry has nothing
 $last_keyed = $telem['last_keyed_at'] ?? null;
 if (!$last_keyed) {
