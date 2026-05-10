@@ -36,6 +36,7 @@ require_once TTN_INCLUDES . '/header.php';
     </div>
 
     <div class="listen-status offline" id="stream-status">⟳ CHECKING STREAM...</div>
+    <div class="listen-status" id="listener-count"></div>
 
     <div class="listen-links">
         <a href="https://stream.ttn.radio/live">DIRECT STREAM</a>
