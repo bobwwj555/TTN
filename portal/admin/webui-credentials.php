@@ -59,7 +59,7 @@ function do_sync(int $operator_id, int $server_id, string $interface, string $pa
     if (!$is_admin && !in_array($server_id, $allowed_server_ids))
         return ['ok'=>false,'error'=>'Access denied to this server.'];
     $op     = db_row("SELECT callsign FROM operators WHERE id=?", [$operator_id]);
-    $server = db_row("SELECT hostname, asterisk_ip, ip_address FROM asl_servers WHERE id=?", [$server_id]);
+    $server = db_row("SELECT hostname, asterisk_ip, ip_address, agent_ip FROM asl_servers WHERE id=?", [$server_id]);
     $secret = get_agent_secret($server_id);
     if (!$op || !$server) return ['ok'=>false,'error'=>'Invalid operator or server.'];
     if (!$secret)          return ['ok'=>false,'error'=>'No agent secret configured for this server.'];
