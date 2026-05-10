@@ -2,7 +2,7 @@
 require_once '/etc/ttn_config.php';
 require_once TTN_INCLUDES . '/db.php';
 require_once TTN_INCLUDES . '/auth.php';
-ttn_require_role('operator');
+ttn_require_role('viewer');
 
 $adm_title = 'Sites';
 $adm_page  = 'sites';
