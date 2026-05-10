@@ -53,16 +53,20 @@ async function checkStream() {
         const d = await r.json();
         const src = d?.icestats?.source;
         const live = src && (Array.isArray(src) ? src.length > 0 : true);
+        const listeners = Array.isArray(src) ? src.reduce((a,s) => a + (s.listeners||0), 0) : (src?.listeners ?? 0);
         if (live) {
             el.textContent = '◉ STREAM LIVE';
             el.className = 'listen-status live';
+            lel.textContent = listeners + ' LISTENER' + (listeners !== 1 ? 'S' : '');
         } else {
-            el.textContent = '○ NO ACTIVE SOURCE — HUB AUDIO PENDING';
+            el.textContent = '○ NO ACTIVE SOURCE — HUB AUDIO PENDING or Reload Page';
             el.className = 'listen-status offline';
+            lel.textContent = '';
         }
     } catch(e) {
         el.textContent = '○ STREAM OFFLINE';
         el.className = 'listen-status offline';
+        lel.textContent = '';
     }
 }
 checkStream();
