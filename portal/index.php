@@ -240,6 +240,7 @@ require_once TTN_INCLUDES . '/header.php';
             <a href="#network" class="btn-p">▸ VIEW NETWORK</a>
             <a href="#connect" class="btn-g">CONNECT TO TTN</a>
             <a href="<?= htmlspecialchars($gofundme) ?>" class="btn-g" target="_blank">SUPPORT TTN</a>
+            <a href="/listen" class="btn-g">🔊 LISTEN LIVE</a>
         </div>
     </div>
     <div class="hero-right">
