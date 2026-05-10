@@ -72,6 +72,23 @@ async function checkStream() {
 }
 checkStream();
 setInterval(checkStream, 15000);
+// Auto-reconnect audio on stream recovery
+let wasLive = false;
+async function autoReconnect() {
+    try {
+        const r = await fetch('https://stream.ttn.radio/status-json.xsl', {cache:'no-store'});
+        const d = await r.json();
+        const src = d?.icestats?.source;
+        const live = src && (Array.isArray(src) ? src.length > 0 : true);
+        const audio = document.getElementById('ttn-audio');
+        if (live && !wasLive && audio.paused) {
+            audio.load();
+            audio.play().catch(() => {});
+        }
+        wasLive = live;
+    } catch(e) {}
+}
+setInterval(autoReconnect, 10000);
 </script>
 
 <?php require_once TTN_INCLUDES . '/footer.php'; ?>
