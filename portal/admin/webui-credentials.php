@@ -97,6 +97,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = 'Agent secret saved.';
         }
     }
+    if ($pa === 'save_server_interfaces' && $is_admin) {
+        $server_id = (int)$_POST['server_id'];
+        $ifaces    = trim($_POST['supported_interfaces'] ?? '');
+        // Sanitize — only allow known interface names
+        $allowed   = ['supermon','supermon_ng','allscan','allscanx','allmon3','stream','camera','custom'];
+        $parts     = array_filter(array_map('trim', explode(',', $ifaces)));
+        $clean     = implode(',', array_filter($parts, fn($p) => in_array($p, $allowed)));
+        db_execute("UPDATE asl_servers SET supported_interfaces=? WHERE id=?", [$clean ?: null, $server_id]);
+        $msg = 'Server interfaces saved.';
+    }
 
     if ($pa === 'change_own_password') {
         $current  = $_POST['current_password'] ?? '';
@@ -141,7 +151,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $operator_id = (int)$_POST['operator_id']; $server_id = (int)$_POST['server_id'];
         $password = $_POST['password'] ?? ''; $access = $_POST['access_level'] ?? 'operator';
         $results = []; $has_error = false;
-        foreach (['supermon','supermon_ng','allscan','allmon3'] as $iface) {
+        $srv_row = db_row("SELECT supported_interfaces FROM asl_servers WHERE id=?", [$server_id]);
+        $ifaces = $srv_row['supported_interfaces'] ? explode(',', $srv_row['supported_interfaces']) : ['supermon','supermon_ng','allscan','allmon3'];
+        foreach ($ifaces as $iface) {
             $r = do_sync($operator_id, $server_id, $iface, $password, $access, $my_id, $allowed_server_ids, $is_admin);
             if (!$r['ok']) $has_error = true;
             if (isset($r['error']) && empty($results)) { $err = $r['error']; break; }
