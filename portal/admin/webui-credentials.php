@@ -36,6 +36,9 @@ $allowed_servers    = get_allowed_servers($my_id, $is_admin);
 $allowed_server_ids = array_column($allowed_servers, 'id');
 
 function get_agent_secret(int $server_id): string {
+    // Try asl_servers.agent_secret first, fall back to site_settings
+    $srv = db_row("SELECT agent_secret FROM asl_servers WHERE id=?", [$server_id]);
+    if ($srv && !empty($srv['agent_secret'])) return $srv['agent_secret'];
     $row = db_row("SELECT setting_val FROM site_settings WHERE setting_key=?", ["agent_secret_{$server_id}"]);
     return $row['setting_val'] ?? '';
 }
@@ -61,7 +64,7 @@ function do_sync(int $operator_id, int $server_id, string $interface, string $pa
     if (!$op || !$server) return ['ok'=>false,'error'=>'Invalid operator or server.'];
     if (!$secret)          return ['ok'=>false,'error'=>'No agent secret configured for this server.'];
     if (strlen($password) < 6) return ['ok'=>false,'error'=>'Password must be at least 6 characters.'];
-    $agent_ip  = $server['asterisk_ip'] ?: $server['ip_address'];
+    $agent_ip  = $server['agent_ip'] ?: $server['asterisk_ip'] ?: $server['ip_address'];
     $agent_url = "http://{$agent_ip}:8765/agent.php";
     $result    = call_agent($agent_url, $secret, $interface, $op['callsign'], $password);
     $status    = $result['ok'] ? 'ok' : 'error';
