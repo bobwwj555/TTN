@@ -493,7 +493,7 @@ async function fetchNodeStatus(node) {
                     const num  = n.node || n.nodenum || '—';
                     const call = n.callsign || n.call || '';
                     const state= n.state || '';
-                    return `<div class="live-node-row"><span class="ln-node">${num}</span><span class="ln-call">${call}</span><span class="ln-state">${state}</span></div>`;
+                    const loc = n.location || ""; const info = n.info || ""; const detail = [info, loc].filter(Boolean).join(" · "); return `<div class="live-node-row"><span class="ln-node">${num}</span><span class="ln-call">${call}</span>${detail ? `<span class="ln-state">${detail}</span>` : ""}</div>`;
                 }).join('');
             } else {
                 const lh = HUB_LAST_KEYED ? `<span style="color:var(--t3)"> · last heard ${HUB_LAST_KEYED}</span>` : '';
