@@ -285,6 +285,31 @@ require_once TTN_INCLUDES . '/admin_nav.php';
     </div>
 </div>
 <?php endif; ?>
+<?php if ($is_admin): ?>
+<div class="panel" style="margin-bottom:1.5rem">
+    <div class="panel-hd">Node Server — Supported Interfaces</div>
+    <div class="panel-body">
+    <p style="color:var(--t2);font-size:0.78rem;margin-bottom:1rem">Comma-separated interfaces the agent supports per server. Sync All only attempts these.</p>
+    <?php
+    $all_srv_detail = db_rows("SELECT id, hostname, supported_interfaces, agent_ip, public_hostname FROM asl_servers WHERE is_active=1 ORDER BY hostname");
+    foreach ($all_srv_detail as $srv): ?>
+    <form method="post" style="display:flex;gap:0.5rem;align-items:flex-end;margin-bottom:0.6rem;flex-wrap:wrap">
+        <?= ttn_csrf_field() ?>
+        <input type="hidden" name="post_action" value="save_server_interfaces">
+        <input type="hidden" name="server_id" value="<?= $srv['id'] ?>">
+        <div class="field">
+            <label style="font-family:var(--mono);font-size:0.7rem"><?= htmlspecialchars($srv['hostname']) ?><?= $srv['public_hostname'] ? ' · '.htmlspecialchars($srv['public_hostname']) : '' ?><?= $srv['agent_ip'] ? ' · '.htmlspecialchars($srv['agent_ip']) : '' ?></label>
+            <input type="text" name="supported_interfaces"
+                value="<?= htmlspecialchars($srv['supported_interfaces'] ?? '') ?>"
+                placeholder="supermon,supermon_ng,allscan,allmon3"
+                style="font-family:var(--mono);font-size:0.72rem;width:380px;background:var(--bg2);border:1px solid var(--border2);color:var(--t1);padding:0.35rem 0.5rem">
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm">Save</button>
+    </form>
+    <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php if (($is_admin || $is_site_admin) && !empty($allowed_servers)): ?>
 <div class="panel" style="margin-bottom:1.5rem">
