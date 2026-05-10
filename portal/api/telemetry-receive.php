@@ -89,7 +89,8 @@ foreach ($nodes as $node_num => $node_data) {
 
     // Write connection events to conn_log
     // conn_log requires system_id — skip private unlinked nodes
-    if (!$system_id) {
+    // Only track connections for hub nodes (is_hub=1) — non-hub nodes share system_id and cause false disconnects
+    if (!$system_id || !$sys_asl['is_hub']) {
         $saved++;
         continue;
     }
