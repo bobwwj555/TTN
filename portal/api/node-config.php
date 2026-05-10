@@ -92,7 +92,7 @@ if ($site['coverage_url']) $images[] = [$site['coverage_url'], 'Coverage Estimat
 $hub_node = $sys['hub_asl'] ?? ($asl_nodes[0]['asl_number'] ?? '');
 $hub_freq = ($sys && $sys['freq_tx'] && $sys['freq_tx'] != '0.0000') ? $sys['freq_tx'] : '';
 $callsign = $sys['callsign'] ?? '';
-$description = $site['notes'] ?? ('TTN '.$site['name'].' node. AllStarLink backbone for the Tennessee Technological Community.');
+$description = !empty($site['notes']) ? $site['notes'] : ($site['name'].' · AllStarLink node · Tennessee Technological Community');
 $site_url = db_row("SELECT setting_val FROM site_settings WHERE setting_key='site_url'")['setting_val'] ?? 'https://ttn.radio';
 
 echo json_encode([
