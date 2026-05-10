@@ -52,13 +52,17 @@ try {
 // Recent connections (currently active = no disconnected_at)
 $active = [];
 try {
-    $active = db_rows("
-        SELECT connected_node AS node, callsign, location, direction
-        FROM conn_log
-        WHERE system_id = ? AND disconnected_at IS NULL
-        ORDER BY connected_at DESC
-        LIMIT 20
-    ", [$sys['id']]);
+	$active = db_rows("
+	    SELECT c.connected_node AS node,
+	           COALESCE(NULLIF(c.callsign,''), sa.callsign, '') AS callsign,
+	           COALESCE(NULLIF(c.location,''), '') AS location,
+	           c.direction
+	    FROM conn_log c
+	    LEFT JOIN sys_asl sa ON sa.asl_number = c.connected_node
+	    WHERE c.system_id = ? AND c.disconnected_at IS NULL
+	    ORDER BY c.connected_at DESC
+	    LIMIT 20
+	", [$sys['id']]);
 } catch (Exception $e) {}
 
 // Last heard — most recent conn_log entry if telemetry has nothing
