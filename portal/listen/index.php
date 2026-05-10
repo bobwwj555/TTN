@@ -48,6 +48,7 @@ require_once TTN_INCLUDES . '/header.php';
 <script>
 async function checkStream() {
     const el = document.getElementById('stream-status');
+    const lel = document.getElementById('listener-count');
     try {
         const r = await fetch('https://stream.ttn.radio/status-json.xsl', {cache:'no-store'});
         const d = await r.json();
