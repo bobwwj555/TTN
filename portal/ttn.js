@@ -68,17 +68,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const toast = document.getElementById('cwToast');
 
   if (logo && toast) {
-    logo.addEventListener('dblclick', (e) => {
-      e.preventDefault();
-      if (cwCooldown) return;
-      cwCooldown = true;
-      setTimeout(() => cwCooldown = false, 12000);
-
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 4500);
-      playCW('W4BWW DE TTN 73');
+    logo.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (cwCooldown) return;
+        cwCooldown = true;
+        setTimeout(() => cwCooldown = false, 12000);
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 4500);
+        playCW('W4BWW DE TTN 73');
     });
-  }
+    logo.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        window.location.href = '/';
+    });
+   }
 });
 
 
