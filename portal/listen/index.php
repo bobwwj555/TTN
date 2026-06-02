@@ -26,11 +26,11 @@ require_once TTN_INCLUDES . '/header.php';
 <div class="listen-wrap">
     <div class="listen-eyebrow"><?= htmlspecialchars($org_name) ?> · <?= htmlspecialchars($callsign) ?></div>
     <div class="listen-title">LISTEN LIVE</div>
-    <div class="listen-sub">TTN HUB AUDIO · ALLSTARLINK NODE <?= htmlspecialchars($hub_node) ?> · stream.ttn.radio</div>
+    <div class="listen-sub">TTN HUB AUDIO · ALLSTARLINK NODE <?= htmlspecialchars($hub_node) ?> · stream.ttechnological.net</div>
 
     <div class="listen-player">
         <audio id="ttn-audio" controls autoplay preload="none">
-            <source src="https://stream.ttn.radio/live" type="audio/mpeg">
+            <source src="https://stream.ttechnological.net/live" type="audio/mpeg">
             Your browser does not support audio streaming.
         </audio>
     </div>
@@ -39,8 +39,8 @@ require_once TTN_INCLUDES . '/header.php';
     <div class="listen-status" id="listener-count"></div>
 
     <div class="listen-links">
-        <a href="https://stream.ttn.radio/live">DIRECT STREAM</a>
-        <a href="https://stream.ttn.radio">ICECAST STATUS</a>
+        <a href="https://stream.ttechnological.net/live">DIRECT STREAM</a>
+        <a href="https://stream.ttechnological.net">ICECAST STATUS</a>
         <a href="/">← HOME</a>
     </div>
 </div>
@@ -50,7 +50,7 @@ async function checkStream() {
     const el = document.getElementById('stream-status');
     const lel = document.getElementById('listener-count');
     try {
-        const r = await fetch('https://stream.ttn.radio/status-json.xsl', {cache:'no-store'});
+        const r = await fetch('https://stream.ttechnological.net/status-json.xsl', {cache:'no-store'});
         const d = await r.json();
         const src = d?.icestats?.source;
         const live = src && (Array.isArray(src) ? src.length > 0 : true);
@@ -76,7 +76,7 @@ setInterval(checkStream, 15000);
 let wasLive = false;
 async function autoReconnect() {
     try {
-        const r = await fetch('https://stream.ttn.radio/status-json.xsl', {cache:'no-store'});
+        const r = await fetch('https://stream.ttechnological.net/status-json.xsl', {cache:'no-store'});
         const d = await r.json();
         const src = d?.icestats?.source;
         const live = src && (Array.isArray(src) ? src.length > 0 : true);
