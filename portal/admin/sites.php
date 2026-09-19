@@ -107,6 +107,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ── SAVE SUBNET (LAN mapping) ─────────────────────────────
+    if ($pa === 'save_subnet') {
+        $sid = (int)$_POST['lan_site_id'];
+        if (!can_edit_site($sid, $is_admin, $my_op_id)) {
+            $err = 'Permission denied.';
+        } else {
+            $subnet_id = (int)($_POST['subnet_id'] ?? 0);
+            $valid_types = ['lan','vlan','aredn','tunnel','iot','cameras','management','other'];
+            $ntype = $_POST['network_type'] ?? 'lan';
+            if (!in_array($ntype, $valid_types)) $ntype = 'other';
+            $data = [
+                'site_id'        => $sid,
+                'subnet'         => trim($_POST['subnet']    ?? ''),
+                'cidr'           => (int)($_POST['cidr']     ?? 24),
+                'network_type'   => $ntype,
+                'label'          => trim($_POST['label']     ?? ''),
+                'vlan_id'        => (int)($_POST['vlan_id']  ?? 0) ?: null,
+                'gateway'        => trim($_POST['gateway']   ?? '') ?: null,
+                'is_ttn_managed' => isset($_POST['is_ttn_managed']) ? 1 : 0,
+                'notes'          => trim($_POST['subnet_notes'] ?? '') ?: null,
+            ];
+            if (!$data['subnet'] || !$data['label']) {
+                $err = 'Subnet and label are required.';
+            } elseif ($subnet_id) {
+                $sets = implode(',', array_map(fn($k) => "`$k`=?", array_keys($data)));
+                db_execute("UPDATE network_subnets SET $sets WHERE id=?", [...array_values($data), $subnet_id]);
+                $msg = 'Subnet updated.';
+            } else {
+                db_insert('network_subnets', $data);
+                $msg = 'Subnet added.';
+            }
+            $action = 'edit'; $edit_id = $sid;
+        }
+    }
+
+    // ── DELETE SUBNET ─────────────────────────────────────────
+    if ($pa === 'delete_subnet') {
+        $subnet_id = (int)$_POST['subnet_id'];
+        $row = db_row("SELECT site_id FROM network_subnets WHERE id=?", [$subnet_id]);
+        if (!$row || !can_edit_site($row['site_id'], $is_admin, $my_op_id)) {
+            $err = 'Permission denied.';
+        } else {
+            db_execute("UPDATE network_devices SET subnet_id=NULL WHERE subnet_id=?", [$subnet_id]);
+            db_execute("DELETE FROM network_subnets WHERE id=?", [$subnet_id]);
+            $msg = 'Subnet removed.'; $action = 'edit'; $edit_id = $row['site_id'];
+        }
+    }
+
+    // ── SAVE DEVICE (LAN mapping) ─────────────────────────────
+    if ($pa === 'save_device') {
+        $sid = (int)$_POST['lan_site_id'];
+        if (!can_edit_site($sid, $is_admin, $my_op_id)) {
+            $err = 'Permission denied.';
+        } else {
+            $device_id = (int)($_POST['device_id'] ?? 0);
+            $valid_types = ['firewall','switch','access_point','server','virtual_machine',
+                'allstar_server','aredn_node','dns_server','ldap_server','chat_server',
+                'camera','camera_server','camera_hub','ntp_clock','sdr_radio','dmr_server',
+                'aprs','scanner','controller','other'];
+            $dtype = $_POST['device_type'] ?? 'other';
+            if (!in_array($dtype, $valid_types)) $dtype = 'other';
+            $hostname = trim($_POST['hostname'] ?? '');
+            $data = [
+                'site_id'        => $sid,
+                'subnet_id'      => (int)($_POST['subnet_id'] ?? 0) ?: null,
+                'hostname'       => $hostname,
+                'display_name'   => trim($_POST['display_name'] ?? '') ?: null,
+                'make'           => trim($_POST['make']  ?? '') ?: null,
+                'model'          => trim($_POST['model'] ?? '') ?: null,
+                'device_type'    => $dtype,
+                'is_physical'    => isset($_POST['is_physical']) ? 1 : 0,
+                'parent_host_id' => (int)($_POST['parent_host_id'] ?? 0) ?: null,
+                'function'       => trim($_POST['device_function'] ?? '') ?: null,
+                'os'             => trim($_POST['os'] ?? '') ?: null,
+                'public_ip'      => trim($_POST['public_ip'] ?? '') ?: null,
+                'ip_address'     => trim($_POST['ip_address'] ?? '') ?: null,
+                'mac_address'    => trim($_POST['mac_address'] ?? '') ?: null,
+                'port_speed'     => trim($_POST['port_speed'] ?? '') ?: null,
+                'web_ports'      => trim($_POST['web_ports'] ?? '') ?: null,
+                'asl_nodes_json' => trim($_POST['asl_nodes_json'] ?? '') ?: null,
+                'asl_port'       => (int)($_POST['dev_asl_port'] ?? 0) ?: null,
+                'is_ttn_managed' => isset($_POST['dev_is_ttn_managed']) ? 1 : 0,
+                'is_active'      => isset($_POST['dev_is_active']) ? 1 : 0,
+                'notes'          => trim($_POST['device_notes'] ?? '') ?: null,
+            ];
+            if (!$hostname) {
+                $err = 'Hostname is required.';
+            } elseif ($device_id && (int)($data['parent_host_id'] ?? 0) === $device_id) {
+                $err = 'A device cannot be its own parent host.';
+            } elseif ($device_id) {
+                $sets = implode(',', array_map(fn($k) => "`$k`=?", array_keys($data)));
+                db_execute("UPDATE network_devices SET $sets WHERE id=?", [...array_values($data), $device_id]);
+                $msg = 'Device updated.';
+            } else {
+                try {
+                    db_insert('network_devices', $data);
+                    $msg = 'Device added.';
+                } catch (PDOException $e) {
+                    $err = (str_contains($e->getMessage(), 'uq_hostname'))
+                        ? "A device named '$hostname' already exists — hostnames must be unique network-wide."
+                        : 'Could not save device.';
+                }
+            }
+            $action = 'edit'; $edit_id = $sid;
+        }
+    }
+
+    // ── DELETE DEVICE ────────────────────────────────────────
+    if ($pa === 'delete_device') {
+        $device_id = (int)$_POST['device_id'];
+        $row = db_row("SELECT site_id FROM network_devices WHERE id=?", [$device_id]);
+        if (!$row || !can_edit_site($row['site_id'], $is_admin, $my_op_id)) {
+            $err = 'Permission denied.';
+        } else {
+            db_execute("UPDATE network_devices SET parent_host_id=NULL WHERE parent_host_id=?", [$device_id]);
+            db_execute("DELETE FROM network_devices WHERE id=?", [$device_id]);
+            $msg = 'Device removed.'; $action = 'edit'; $edit_id = $row['site_id'];
+        }
+    }
+
     // ── CREATE SYSTEM ────────────────────────────────────────
     if ($pa === 'create_system') {
         $sid = (int)$_POST['site_id'];
@@ -406,6 +526,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── LOAD DATA ─────────────────────────────────────────────────
 $edit_site    = null;
 $edit_systems = [];
+$edit_subnets = [];
+$edit_devices = [];
 if (($action === 'edit' || $action === 'system') && $edit_id) {
     $edit_site = db_row("SELECT * FROM sites WHERE id=?", [$edit_id]);
     if (!$edit_site) { $action = 'list'; $edit_id = 0; }
@@ -418,6 +540,14 @@ if (($action === 'edit' || $action === 'system') && $edit_id) {
             try { $sys['sera'] = db_rows("SELECT * FROM sera_records WHERE system_id=? ORDER BY coordinated_at DESC", [$sys['id']]); } catch (Exception $e) { $sys['sera'] = []; }
         }
         unset($sys);
+
+        // LAN mapping — this site's subnets and devices (TASK-006)
+        $edit_subnets = db_rows("SELECT * FROM network_subnets WHERE site_id=? ORDER BY network_type, subnet", [$edit_id]);
+        $edit_devices = db_rows("SELECT d.*, sn.subnet AS subnet_cidr, sn.label AS subnet_label, p.hostname AS parent_hostname
+            FROM network_devices d
+            LEFT JOIN network_subnets sn ON sn.id = d.subnet_id
+            LEFT JOIN network_devices p  ON p.id  = d.parent_host_id
+            WHERE d.site_id=? ORDER BY d.is_active DESC, d.device_type, d.hostname", [$edit_id]);
     }
 }
 
@@ -556,6 +686,195 @@ require_once TTN_INCLUDES . '/admin_nav.php';
         </div>
         <button type="submit" class="btn btn-primary" style="margin-top:1rem">Save Site</button>
     </form>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (can_edit_site($edit_id, $is_admin, $my_op_id)): ?>
+<!-- ── NETWORK / LAN MAP (site-manager scoped, TASK-006) ── -->
+<div class="panel" style="margin-bottom:1.5rem">
+    <div class="panel-hd">LAN Map — Subnets (<?= count($edit_subnets) ?>)</div>
+    <div class="panel-body">
+    <table class="adm-tbl">
+        <thead><tr><th>Subnet</th><th>Type</th><th>Label</th><th>VLAN</th><th>Gateway</th><th>Managed</th><th></th></tr></thead>
+        <tbody>
+        <?php foreach ($edit_subnets as $sn): ?>
+        <tr>
+            <td class="mono" style="color:var(--amber)"><?= htmlspecialchars($sn['subnet']) ?>/<?= $sn['cidr'] ?></td>
+            <td class="muted" style="font-size:0.7rem"><?= htmlspecialchars($sn['network_type']) ?></td>
+            <td><?= htmlspecialchars($sn['label']) ?></td>
+            <td class="mono muted"><?= $sn['vlan_id'] ?? '—' ?></td>
+            <td class="mono muted"><?= htmlspecialchars($sn['gateway'] ?? '—') ?></td>
+            <td><?= $sn['is_ttn_managed'] ? '<span style="color:var(--green)">✓</span>' : '—' ?></td>
+            <td>
+                <details><summary style="cursor:pointer;color:var(--green);font-size:0.6rem">Edit</summary>
+                <form method="post" style="margin-top:0.5rem;padding:0.7rem;background:var(--panel2,#00000022)">
+                    <?= ttn_csrf_field() ?>
+                    <input type="hidden" name="post_action" value="save_subnet">
+                    <input type="hidden" name="lan_site_id" value="<?= $edit_id ?>">
+                    <input type="hidden" name="subnet_id" value="<?= $sn['id'] ?>">
+                    <div class="field-row3">
+                        <div class="field"><label>Subnet</label><input type="text" name="subnet" value="<?= htmlspecialchars($sn['subnet']) ?>" required></div>
+                        <div class="field"><label>CIDR</label><input type="number" name="cidr" value="<?= $sn['cidr'] ?>" min="1" max="32"></div>
+                        <div class="field"><label>Type</label>
+                            <select name="network_type"><?php foreach (['lan','vlan','aredn','tunnel','iot','cameras','management','other'] as $t): ?>
+                                <option value="<?= $t ?>" <?= $sn['network_type']===$t?'selected':'' ?>><?= $t ?></option>
+                            <?php endforeach; ?></select>
+                        </div>
+                    </div>
+                    <div class="field-row3">
+                        <div class="field"><label>Label</label><input type="text" name="label" value="<?= htmlspecialchars($sn['label']) ?>" required></div>
+                        <div class="field"><label>VLAN ID</label><input type="number" name="vlan_id" value="<?= $sn['vlan_id'] ?? '' ?>"></div>
+                        <div class="field"><label>Gateway</label><input type="text" name="gateway" value="<?= htmlspecialchars($sn['gateway'] ?? '') ?>"></div>
+                    </div>
+                    <div class="field"><label>Notes</label><textarea name="subnet_notes" rows="2"><?= htmlspecialchars($sn['notes'] ?? '') ?></textarea></div>
+                    <div class="check-row"><input type="checkbox" name="is_ttn_managed" id="sn_mgd_<?= $sn['id'] ?>" <?= $sn['is_ttn_managed']?'checked':'' ?>><label for="sn_mgd_<?= $sn['id'] ?>">TTN-managed</label></div>
+                    <div style="display:flex;gap:0.5rem;margin-top:0.6rem">
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                    </div>
+                </form>
+                <form method="post" onsubmit="return confirm('Remove this subnet? Devices on it will be unassigned, not deleted.');" style="margin-top:0.4rem">
+                    <?= ttn_csrf_field() ?>
+                    <input type="hidden" name="post_action" value="delete_subnet">
+                    <input type="hidden" name="subnet_id" value="<?= $sn['id'] ?>">
+                    <button type="submit" class="btn btn-secondary btn-sm">Delete Subnet</button>
+                </form>
+                </details>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        <?php if (empty($edit_subnets)): ?><tr><td colspan="7" class="muted">No subnets mapped yet.</td></tr><?php endif; ?>
+        </tbody>
+    </table>
+    <details style="margin-top:1rem"><summary style="cursor:pointer;color:var(--green)">+ Add Subnet</summary>
+    <form method="post" style="margin-top:0.6rem">
+        <?= ttn_csrf_field() ?>
+        <input type="hidden" name="post_action" value="save_subnet">
+        <input type="hidden" name="lan_site_id" value="<?= $edit_id ?>">
+        <div class="field-row3">
+            <div class="field"><label>Subnet *</label><input type="text" name="subnet" placeholder="172.20.7.0" required></div>
+            <div class="field"><label>CIDR</label><input type="number" name="cidr" value="24" min="1" max="32"></div>
+            <div class="field"><label>Type</label>
+                <select name="network_type"><?php foreach (['lan','vlan','aredn','tunnel','iot','cameras','management','other'] as $t): ?>
+                    <option value="<?= $t ?>"><?= $t ?></option>
+                <?php endforeach; ?></select>
+            </div>
+        </div>
+        <div class="field-row3">
+            <div class="field"><label>Label *</label><input type="text" name="label" placeholder="Piedmont infra bridge" required></div>
+            <div class="field"><label>VLAN ID</label><input type="number" name="vlan_id"></div>
+            <div class="field"><label>Gateway</label><input type="text" name="gateway" placeholder="172.20.7.1"></div>
+        </div>
+        <div class="check-row"><input type="checkbox" name="is_ttn_managed" id="sn_new_mgd" checked><label for="sn_new_mgd">TTN-managed</label></div>
+        <button type="submit" class="btn btn-primary" style="margin-top:0.6rem">Add Subnet</button>
+    </form>
+    </details>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom:1.5rem">
+    <div class="panel-hd">LAN Map — Devices (<?= count($edit_devices) ?>)</div>
+    <div class="panel-body">
+    <table class="adm-tbl">
+        <thead><tr><th>Hostname</th><th>Type</th><th>IP</th><th>Subnet</th><th>Parent</th><th>Active</th><th></th></tr></thead>
+        <tbody>
+        <?php foreach ($edit_devices as $dev): ?>
+        <tr style="<?= !$dev['is_active'] ? 'opacity:0.5' : '' ?>">
+            <td class="mono"><?= htmlspecialchars($dev['display_name'] ?: $dev['hostname']) ?></td>
+            <td style="font-family:var(--mono);font-size:0.6rem;text-transform:uppercase;color:var(--amber)"><?= str_replace('_',' ',$dev['device_type']) ?></td>
+            <td class="mono muted"><?= htmlspecialchars($dev['ip_address'] ?? '—') ?></td>
+            <td class="mono muted" style="font-size:0.65rem"><?= htmlspecialchars($dev['subnet_cidr'] ?? '—') ?></td>
+            <td class="mono muted"><?= htmlspecialchars($dev['parent_hostname'] ?? '—') ?></td>
+            <td><?= $dev['is_active'] ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>' ?></td>
+            <td>
+                <details><summary style="cursor:pointer;color:var(--green);font-size:0.6rem">Edit</summary>
+                <form method="post" style="margin-top:0.5rem;padding:0.7rem;background:var(--panel2,#00000022)">
+                    <?= ttn_csrf_field() ?>
+                    <input type="hidden" name="post_action" value="save_device">
+                    <input type="hidden" name="lan_site_id" value="<?= $edit_id ?>">
+                    <input type="hidden" name="device_id" value="<?= $dev['id'] ?>">
+                    <div class="field-row3">
+                        <div class="field"><label>Hostname *</label><input type="text" name="hostname" value="<?= htmlspecialchars($dev['hostname']) ?>" required></div>
+                        <div class="field"><label>Display Name</label><input type="text" name="display_name" value="<?= htmlspecialchars($dev['display_name'] ?? '') ?>"></div>
+                        <div class="field"><label>Type</label>
+                            <select name="device_type"><?php foreach (['firewall','switch','access_point','server','virtual_machine','allstar_server','aredn_node','dns_server','ldap_server','chat_server','camera','camera_server','camera_hub','ntp_clock','sdr_radio','dmr_server','aprs','scanner','controller','other'] as $t): ?>
+                                <option value="<?= $t ?>" <?= $dev['device_type']===$t?'selected':'' ?>><?= str_replace('_',' ',$t) ?></option>
+                            <?php endforeach; ?></select>
+                        </div>
+                    </div>
+                    <div class="field-row3">
+                        <div class="field"><label>IP Address</label><input type="text" name="ip_address" value="<?= htmlspecialchars($dev['ip_address'] ?? '') ?>"></div>
+                        <div class="field"><label>Public IP</label><input type="text" name="public_ip" value="<?= htmlspecialchars($dev['public_ip'] ?? '') ?>"></div>
+                        <div class="field"><label>MAC Address</label><input type="text" name="mac_address" value="<?= htmlspecialchars($dev['mac_address'] ?? '') ?>"></div>
+                    </div>
+                    <div class="field-row3">
+                        <div class="field"><label>Subnet</label>
+                            <select name="subnet_id"><option value="">—</option><?php foreach ($edit_subnets as $sn2): ?>
+                                <option value="<?= $sn2['id'] ?>" <?= (int)($dev['subnet_id']??0)===(int)$sn2['id']?'selected':'' ?>><?= htmlspecialchars($sn2['subnet'].'/'.$sn2['cidr'].' — '.$sn2['label']) ?></option>
+                            <?php endforeach; ?></select>
+                        </div>
+                        <div class="field"><label>Parent Host (for VMs)</label>
+                            <select name="parent_host_id"><option value="">—</option><?php foreach ($edit_devices as $ph): if ($ph['id']===$dev['id']) continue; ?>
+                                <option value="<?= $ph['id'] ?>" <?= (int)($dev['parent_host_id']??0)===(int)$ph['id']?'selected':'' ?>><?= htmlspecialchars($ph['hostname']) ?></option>
+                            <?php endforeach; ?></select>
+                        </div>
+                        <div class="field"><label>Make / Model</label><input type="text" name="make" value="<?= htmlspecialchars($dev['make'] ?? '') ?>" placeholder="Make">
+                            <input type="text" name="model" value="<?= htmlspecialchars($dev['model'] ?? '') ?>" placeholder="Model" style="margin-top:0.3rem"></div>
+                    </div>
+                    <div class="field"><label>Function / Notes</label><input type="text" name="device_function" value="<?= htmlspecialchars($dev['function'] ?? '') ?>" placeholder="What it does"></div>
+                    <div class="field"><label>Notes</label><textarea name="device_notes" rows="2"><?= htmlspecialchars($dev['notes'] ?? '') ?></textarea></div>
+                    <div class="check-row"><input type="checkbox" name="is_physical" id="dev_phys_<?= $dev['id'] ?>" <?= $dev['is_physical']?'checked':'' ?>><label for="dev_phys_<?= $dev['id'] ?>">Physical (unchecked = VM)</label></div>
+                    <div class="check-row"><input type="checkbox" name="dev_is_ttn_managed" id="dev_mgd_<?= $dev['id'] ?>" <?= $dev['is_ttn_managed']?'checked':'' ?>><label for="dev_mgd_<?= $dev['id'] ?>">TTN-managed</label></div>
+                    <div class="check-row"><input type="checkbox" name="dev_is_active" id="dev_act_<?= $dev['id'] ?>" <?= $dev['is_active']?'checked':'' ?>><label for="dev_act_<?= $dev['id'] ?>">Active</label></div>
+                    <div style="margin-top:0.6rem"><button type="submit" class="btn btn-primary btn-sm">Save</button></div>
+                </form>
+                <form method="post" onsubmit="return confirm('Delete this device?');" style="margin-top:0.4rem">
+                    <?= ttn_csrf_field() ?>
+                    <input type="hidden" name="post_action" value="delete_device">
+                    <input type="hidden" name="device_id" value="<?= $dev['id'] ?>">
+                    <button type="submit" class="btn btn-secondary btn-sm">Delete Device</button>
+                </form>
+                </details>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        <?php if (empty($edit_devices)): ?><tr><td colspan="7" class="muted">No devices mapped yet.</td></tr><?php endif; ?>
+        </tbody>
+    </table>
+    <details style="margin-top:1rem"><summary style="cursor:pointer;color:var(--green)">+ Add Device</summary>
+    <form method="post" style="margin-top:0.6rem">
+        <?= ttn_csrf_field() ?>
+        <input type="hidden" name="post_action" value="save_device">
+        <input type="hidden" name="lan_site_id" value="<?= $edit_id ?>">
+        <div class="field-row3">
+            <div class="field"><label>Hostname *</label><input type="text" name="hostname" placeholder="switch-piedmont-1" required></div>
+            <div class="field"><label>Display Name</label><input type="text" name="display_name"></div>
+            <div class="field"><label>Type</label>
+                <select name="device_type"><?php foreach (['firewall','switch','access_point','server','virtual_machine','allstar_server','aredn_node','dns_server','ldap_server','chat_server','camera','camera_server','camera_hub','ntp_clock','sdr_radio','dmr_server','aprs','scanner','controller','other'] as $t): ?>
+                    <option value="<?= $t ?>"><?= str_replace('_',' ',$t) ?></option>
+                <?php endforeach; ?></select>
+            </div>
+        </div>
+        <div class="field-row3">
+            <div class="field"><label>IP Address</label><input type="text" name="ip_address" placeholder="172.20.7.x"></div>
+            <div class="field"><label>Subnet</label>
+                <select name="subnet_id"><option value="">—</option><?php foreach ($edit_subnets as $sn2): ?>
+                    <option value="<?= $sn2['id'] ?>"><?= htmlspecialchars($sn2['subnet'].'/'.$sn2['cidr'].' — '.$sn2['label']) ?></option>
+                <?php endforeach; ?></select>
+            </div>
+            <div class="field"><label>Parent Host (for VMs)</label>
+                <select name="parent_host_id"><option value="">—</option><?php foreach ($edit_devices as $ph): ?>
+                    <option value="<?= $ph['id'] ?>"><?= htmlspecialchars($ph['hostname']) ?></option>
+                <?php endforeach; ?></select>
+            </div>
+        </div>
+        <div class="field"><label>Function</label><input type="text" name="device_function" placeholder="What it does"></div>
+        <div class="check-row"><input type="checkbox" name="is_physical" id="dev_new_phys" checked><label for="dev_new_phys">Physical (unchecked = VM)</label></div>
+        <div class="check-row"><input type="checkbox" name="dev_is_ttn_managed" id="dev_new_mgd" checked><label for="dev_new_mgd">TTN-managed</label></div>
+        <div class="check-row"><input type="checkbox" name="dev_is_active" id="dev_new_act" checked><label for="dev_new_act">Active</label></div>
+        <button type="submit" class="btn btn-primary" style="margin-top:0.6rem">Add Device</button>
+    </form>
+    </details>
     </div>
 </div>
 <?php endif; ?>
