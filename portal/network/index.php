@@ -49,7 +49,8 @@ $extra_head = '
 .pop-call{color:var(--amber);font-size:0.85rem;font-weight:700}
 .pop-freq{color:var(--green);margin:0.2rem 0}
 .pop-status{font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;margin-top:0.3rem}
-.pop-live{color:var(--green)}.pop-build{color:var(--amber)}.pop-plan{color:var(--t3)}
+.pop-live{color:var(--green)}.pop-building{color:var(--amber)}.pop-planned{color:var(--t3)}.pop-offline{color:#ff1744}
+.dark-tiles{filter:invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9)}
 .sites-sec{padding:4rem 5vw;background:var(--bg)}
 .sites-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1px;background:var(--border2);border:1px solid var(--border2);margin-top:2rem}
 .site-card{background:var(--panel);padding:1.4rem;transition:background 0.2s;position:relative;overflow:hidden}
@@ -235,9 +236,9 @@ foreach ($mapped_sites as $s) {
 <script>
 (function(){
     const map = L.map('ttn-map',{center:[35.9,-86.5],zoom:7});
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-        attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
-        subdomains:'abcd',maxZoom:19
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        subdomains:'abc',maxZoom:19,className:'dark-tiles'
     }).addTo(map);
     const colors={live:'#00e676',building:'#ffab00',planned:'#6b8899',offline:'#ff1744'};
     const sites=<?= json_encode(array_values($js_sites)) ?>;
