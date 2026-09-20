@@ -41,6 +41,22 @@
  * right listing (or a not-found state) regardless of case, so no local
  * validation of the callsign shape is attempted. Not applied to the
  * enrichSummary() name/location bits -- those aren't callsigns.
+ *
+ * v8: feed rewritten as a real table (Bobby's concrete reference,
+ * 2026-09-20: ECR Hub Monitor, ecrhub.hamcolo.com/live/ -- Node#/Via/
+ * Type/Timestamp(UTC)/Description, newest row on top, Node# and Via
+ * both clickable). Adapted per-mode rather than copied verbatim, since
+ * TTN carries three modes (AllStar/DMR/P25) against ECR's two
+ * (AllStar/IRLP) -- see idLink() in the script below for exactly what
+ * each mode's ID column links to and why, including which link targets
+ * are confirmed-real vs. a deliberately conservative fallback where
+ * they weren't confirmable this session. "Newest on top" needed no
+ * change -- ttn_lastheard_events() already returns connected_at DESC.
+ * Poll interval dropped 30000ms -> 5000ms to match the near-real-time
+ * backend change proposed alongside this (see the separate systemd
+ * daemon notes) -- if that backend change ISN'T deployed, this just
+ * means more frequent polls of the same 5-minute-stale data, worth
+ * reverting if so.
  */
 
 require_once '/etc/ttn_config.php';
@@ -76,11 +92,18 @@ require_once TTN_INCLUDES . '/header.php'; // confirmed via grep on the live ind
 .lh-keyed .box.stale{border-color:var(--amber)}
 .lh-keyed h4{margin:0 0 0.4rem;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3)}
 .lh-keyed .idle{color:var(--t3)}
-.lh-feed{background:var(--panel);border:1px solid var(--border2);margin-top:1rem}
-.lh-row{display:flex;justify-content:space-between;font-size:0.85rem;padding:0.5rem 1rem;border-bottom:1px solid var(--border2)}
-.lh-row .mode{color:var(--t3);font-size:0.7rem;text-transform:uppercase;width:4.5rem;flex-shrink:0}
-.lh-row .call{color:var(--green);font-weight:700;flex:1}
-.lh-row .ts{color:var(--t3);font-size:0.75rem}
+.lh-feed{background:var(--panel);border:1px solid var(--border2);margin-top:1rem;overflow-x:auto}
+.lh-table{width:100%;border-collapse:collapse;font-size:0.85rem}
+.lh-table thead th{text-align:left;font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--t3);padding:0.6rem 1rem;border-bottom:1px solid var(--border2);white-space:nowrap}
+.lh-table tbody td{padding:0.5rem 1rem;border-bottom:1px solid var(--border2);vertical-align:top}
+.lh-table tbody tr:last-child td{border-bottom:none}
+.lh-table tbody tr:hover td{background:rgba(255,255,255,0.03)}
+.lh-table .mode{color:var(--t3);font-size:0.7rem;text-transform:uppercase;white-space:nowrap}
+.lh-table .idcol{white-space:nowrap;font-variant-numeric:tabular-nums}
+.lh-table .call{color:var(--green);font-weight:700;white-space:nowrap}
+.lh-table .ts{color:var(--t3);font-size:0.75rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lh-table .desc{color:var(--t1, #ddd)}
+.lh-table .desc .sub{color:var(--t3);font-size:0.75rem}
 .lh-empty{color:var(--t3);font-size:0.85rem;padding:1rem}
 .lh-feed a.call-link,.lh-keyed a.call-link{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}
 .lh-feed a.call-link:hover,.lh-keyed a.call-link:hover{text-decoration:none;border-bottom-style:solid}
@@ -105,6 +128,41 @@ function qrzLink(call) {
     if (!call) return '—';
     const safe = String(call);
     return `<a class="call-link" href="https://www.qrz.com/db/${encodeURIComponent(safe)}" target="_blank" rel="noopener">${safe}</a>`;
+}
+
+function idLink(e) {
+    // The clickable technical identifier for this row -- ECR Hub
+    // Monitor's Node#/Via pattern, adapted per-mode since TTN carries
+    // three modes against ECR's two:
+    //  - AllStar: the connecting node number -> its AllStarLink stats
+    //    node-info page. URL pattern confirmed real (stats.allstarlink.org
+    //    nodeinfo.cgi?node=<n>), not guessed.
+    //  - DMR: the transmitting radio's ID -> its radioid.net record.
+    //    URL pattern confirmed real (radioid.net/database/view?id=<n>).
+    //    Falls back to the plain talkgroup (TTN's fixed hub TG, 65392)
+    //    when a row has no src_id logged.
+    //  - P25: TTN's P25 designator is a fixed constant (276) for every
+    //    single row -- there's no per-row destination the way DMR's
+    //    src_id gives one. Links to pistar.uk's P25 reflector list (a
+    //    real, previously-confirmed-reachable reference page) rather
+    //    than a guessed dvref.com per-reflector URL -- that site's exact
+    //    public page structure (vs. its documented API paths) isn't
+    //    confirmed, and a guessed link risks a dead link on a public,
+    //    grant-facing page. Worth revisiting if/when DVRef's real page
+    //    structure gets confirmed.
+    if (e.mode === 'AllStar' && e.detail) {
+        return `<a class="call-link" href="http://stats.allstarlink.org/nodeinfo.cgi?node=${encodeURIComponent(e.detail)}" target="_blank" rel="noopener">${e.detail}</a>`;
+    }
+    if (e.mode === 'DMR') {
+        if (e.src_id) {
+            return `<a class="call-link" href="https://radioid.net/database/view?id=${encodeURIComponent(e.src_id)}" target="_blank" rel="noopener">${e.detail || e.src_id}</a>`;
+        }
+        return e.detail || '—';
+    }
+    if (e.mode === 'P25' && e.detail) {
+        return `<a class="call-link" href="https://www.pistar.uk/p25_reflectors.php" target="_blank" rel="noopener">${e.detail}</a>`;
+    }
+    return e.detail || '—';
 }
 
 function renderKeyed(keyed) {
@@ -136,15 +194,25 @@ function enrichSummary(e) {
 function renderFeed(events) {
     const el = document.getElementById('lh-feed');
     if (!events.length) { el.innerHTML = '<div class="lh-empty">No activity in this window.</div>'; return; }
-    el.innerHTML = events.slice(0, 50).map(e => {
+    // Already newest-first -- ttn_lastheard_events() returns connected_at
+    // DESC server-side, so no client-side sort needed here.
+    const rows = events.slice(0, 50).map(e => {
         const extra = enrichSummary(e);
+        const locHtml = e.location ? `<div class="sub">${e.location}</div>` : '';
+        const extraHtml = extra ? `<div class="sub">${extra}</div>` : '';
         return `
-        <div class="lh-row">
-            <span class="mode">${e.mode}</span>
-            <span class="call">${qrzLink(e.callsign)}${e.detail ? ' → ' + e.detail : ''}${e.location ? ` <span style="color:var(--t3);font-weight:400">(${e.location})</span>` : ''}${extra ? `<br><span style="color:var(--t3);font-weight:400;font-size:0.75rem">${extra}</span>` : ''}</span>
-            <span class="ts">${e.connected_at}</span>
-        </div>`;
+        <tr>
+            <td class="mode">${e.mode}</td>
+            <td class="idcol">${idLink(e)}</td>
+            <td class="call">${qrzLink(e.callsign)}</td>
+            <td class="ts">${e.connected_at}</td>
+            <td class="desc">${locHtml}${extraHtml}</td>
+        </tr>`;
     }).join('');
+    el.innerHTML = `<table class="lh-table">
+        <thead><tr><th>Type</th><th>ID</th><th>Callsign</th><th>Time (UTC)</th><th>Details</th></tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
 }
 
 renderKeyed(seedKeyed);
@@ -162,6 +230,9 @@ async function refresh() {
         document.getElementById('lh-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
     } catch (e) { /* leave last good render on screen */ }
 }
-setInterval(refresh, 30000);
+// 5s, down from 30s -- paired with the proposed systemd log-tailer
+// daemon (replaces the 5-min cron) so the page's own staleness stops
+// being the bottleneck once the backend actually updates near-instantly.
+setInterval(refresh, 5000);
 </script>
 <?php require_once TTN_INCLUDES . '/footer.php'; // confirmed via grep on the live index.php (line 462) ?>
