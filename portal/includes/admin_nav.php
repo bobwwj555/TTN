@@ -39,6 +39,7 @@ function _nav_link(string $href, string $label, string $page, string $cur): stri
         <div class="adm-nav-section">System</div>
         <?= _nav_link("$_site_url/admin/settings.php", 'Settings', 'settings', $adm_page) ?>
         <?= _nav_link("$_site_url/admin/webui-credentials.php", 'Web UI Creds', 'webui-credentials', $adm_page) ?>
+        <?= _nav_link("$_site_url/admin/api-credentials.php", 'API Credentials', 'api-credentials', $adm_page) ?>
         <?= _nav_link("$_site_url/admin/operators.php?action=resets", 'Password Resets', 'resets', $adm_page) ?>
         <?php endif; ?>
     </nav>

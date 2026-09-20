@@ -146,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $page_title = 'Enrichment API Credentials';
+$adm_page   = 'api-credentials'; // matches admin_nav.php's new System nav entry -- sets the active-link highlight
 require_once TTN_INCLUDES . '/header.php';
 ?>
 <style>
