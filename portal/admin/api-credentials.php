@@ -29,30 +29,42 @@
  * So: one real form (QRZ) today, three modules confirmed needing
  * nothing, one noted as a likely-future extension point.
  *
- * ASSUMPTION, flagged rather than guessed silently (I don't have the
- * real auth.php/admin file layout to match against): admin gating below
- * checks `$_SESSION['role'] >= 4`, per TTN_Security_2026-05-03.md's
- * stated rule ("Admin paths require role level 4 (admin) -- enforced in
- * auth.php") -- but that doc doesn't give the exact session key name, so
- * this is a best-effort match to the documented rule, not a read of the
- * real auth.php. Swap TTN_ADMIN_SESSION_CHECK below for whatever
- * auth.php's actual helper/session key really is. Same pattern
- * lastheard-feed.php already used for its own session check.
+ * SECOND BUG FOUND AND FIXED (2026-09-20, same live debugging session,
+ * after the first fix above got the page loading but a real admin
+ * session still got bounced): the ASSUMPTION this section used to flag
+ * -- `$_SESSION['role'] >= 4`, guessed with no auth.php to check against
+ * -- was wrong on both axes at once, confirmed by reading the real
+ * includes/auth.php directly:
+ *   - Wrong comparison: `role` is a STRING (viewer/operator/site_admin/
+ *     admin), not a numeric level. `$_SESSION['role'] >= 4` was comparing
+ *     a role string against an int, which is not what rejected valid
+ *     admins by accident so much as never reliably matched real role
+ *     values in the first place.
+ *   - Wrong approach entirely: auth.php already provides
+ *     `ttn_require_role(string $role)` as the real, already-used gate --
+ *     the exact same helper dashboard.php calls (`ttn_require_role
+ *     ('viewer')`, confirmed via a live grep of that file). It handles
+ *     session start (secure cookie params, inactivity timeout via
+ *     ttn_session_start()), redirect-to-login preserving the requested
+ *     URL if not authenticated, and a proper 403 + redirect to
+ *     /admin/dashboard.php?error=access_denied on insufficient role --
+ *     all of which the old inline check reimplemented, and got wrong.
+ * Fixed below to call the real helper directly: `ttn_require_role
+ * ('admin')`. TTN_ADMIN_SESSION_CHECK and the inline $_SESSION check are
+ * gone entirely, not patched.
  *
- * BUG FOUND AND FIXED (2026-09-20, live debugging session): the
- * unauthenticated redirect below originally guessed `/login.php` as the
- * login page's path. Wrong -- confirmed two ways: (1) direct browser
- * fetch, GET /login.php -> 404, GET /admin/login.php -> 200; (2) CT713's
- * own nginx error log, captured earlier the same session, already showed
- * real traffic -- "POST /admin/login.php" with referrer
- * "https://ttechnological.net/admin/login.php" -- i.e. the real login
- * form has always lived at /admin/login.php, not /login.php. Every
- * unauthenticated hit on this page was redirecting into a dead end,
- * which is what read as "doesn't load." Fixed below to the confirmed
- * real path.
+ * FIRST BUG FOUND AND FIXED (2026-09-20, earlier same session): the
+ * unauthenticated redirect used to guess `/login.php` as the login
+ * page's path. Wrong -- confirmed two ways: (1) direct browser fetch,
+ * GET /login.php -> 404, GET /admin/login.php -> 200; (2) CT713's own
+ * nginx error log already showed real traffic -- "POST /admin/login.php"
+ * with referrer "https://ttechnological.net/admin/login.php". Now moot
+ * as a separate fix -- ttn_require_role() above builds the login URL
+ * itself (from the real site_url config, not a hardcoded path), so this
+ * page no longer constructs that redirect at all.
  *
- * ttn_csrf_field() IS a confirmed real function name (same security doc:
- * "ttn_csrf_field() on every form -- no exceptions"), used below as-is.
+ * ttn_csrf_field() and ttn_csrf_verify() ARE confirmed real function
+ * names, read directly from includes/auth.php -- used below as-is.
  *
  * This page never echoes a stored password back into the form or page
  * source -- only a boolean "configured" / "not configured" status per
@@ -65,19 +77,15 @@
 
 require_once '/etc/ttn_config.php';
 require_once TTN_INCLUDES . '/db.php';
+require_once TTN_INCLUDES . '/auth.php';
 require_once __DIR__ . '/../includes/credentials-ini.php';
 
-// ASSUMPTION: swap for auth.php's real admin-check helper/session key --
-// see file header. Fails closed (redirect + exit) either way, so a wrong
-// guess here blocks access rather than silently allowing it.
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    @session_start();
-}
-define('TTN_ADMIN_SESSION_CHECK', ($_SESSION['role'] ?? 0) >= 4);
-if (!TTN_ADMIN_SESSION_CHECK) {
-    header('Location: /admin/login.php');
-    exit;
-}
+// Real gate, confirmed against includes/auth.php -- same helper
+// dashboard.php already uses (ttn_require_role('viewer')). Handles
+// session start, redirect-to-login if unauthenticated, and a 403 +
+// redirect to dashboard if the session's role isn't high enough. See
+// file header for what this replaced and why.
+ttn_require_role('admin');
 
 // Services this page manages. Adding a future service (e.g. a DVRef
 // token, if one is ever obtained) means adding one entry here plus one
