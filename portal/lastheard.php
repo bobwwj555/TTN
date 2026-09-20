@@ -1,0 +1,149 @@
+<?php
+/**
+ * TTN Last-Heard -- public page
+ * LOCATION (proposed): portal/lastheard.php
+ *
+ * v3: initial server-side render now calls the same
+ * includes/lastheard-query.php functions api/lastheard-feed.php uses,
+ * instead of a second, separately-written copy of the queries -- that
+ * duplication is what let the page and the feed drift apart between
+ * the v1 and v2 rounds this session.
+ *
+ * v4: bootstrap fixed per Bobby's live grep-confirmation --
+ * ttn_config.php is at the absolute path /etc/ttn_config.php, not a
+ * relative includes/ path, and db_row()/db_rows() live in a separate
+ * TTN_INCLUDES/db.php that index.php/diag.php require right after
+ * ttn_config.php -- that require was missing entirely before now,
+ * which would have been an undefined-function fatal on every db_row()
+ * call, not graceful degradation. header.php/footer.php's TTN_INCLUDES
+ * paths were already correct -- also confirmed live, no change needed.
+ *
+ * v5: conn_log and sys_telemetry column names corrected against live
+ * DESCRIBE output (in lastheard-query.php) -- conn_log now also
+ * selects `location` for AllStar rows (part of the original design,
+ * missing before); sys_telemetry's real columns are is_online/
+ * last_keyed_at/recorded_at, not the is_keyed/status/updated_at
+ * guessed earlier.
+ *
+ * v6: enrich-*.php modules actually wired in. Before this round, five
+ * fully-built enrich-*.php files existed with no call site anywhere --
+ * copying them onto CT713 alone would not have changed what this page
+ * shows. ttn_lastheard_enrich_events() (in lastheard-query.php) is the
+ * missing glue. The requires below are best-effort: each enrich-*.php
+ * file is required only if it's actually present on disk, so this page
+ * works whether zero, some, or all three are deployed -- each source
+ * activates automatically the moment its file lands in includes/.
+ */
+
+require_once '/etc/ttn_config.php';
+require_once TTN_INCLUDES . '/db.php'; // defines db_row()/db_rows() -- confirmed via index.php/diag.php
+
+// Best-effort enrichment sources -- deliberately NOT require_once,
+// since a missing file must not fatal the page. Must load before
+// lastheard-query.php's ttn_lastheard_events() is actually CALLED
+// below (not before lastheard-query.php is required -- PHP only needs
+// these defined by call time), so function_exists() checks inside
+// ttn_lastheard_enrich_events() see them.
+foreach (['enrich-allstarlink.php', 'enrich-radioid.php', 'enrich-qrz.php'] as $ttn_enrich_file) {
+    $ttn_enrich_path = __DIR__ . '/includes/' . $ttn_enrich_file;
+    if (file_exists($ttn_enrich_path)) {
+        require_once $ttn_enrich_path;
+    }
+}
+unset($ttn_enrich_file, $ttn_enrich_path);
+
+require_once __DIR__ . '/includes/lastheard-query.php';
+
+$events = ttn_lastheard_events(3);
+$keyed  = ttn_lastheard_currently_keyed();
+
+$page_title = 'Last Heard';
+require_once TTN_INCLUDES . '/header.php'; // confirmed via grep on the live index.php (line 91)
+?>
+<style>
+.lh-wrap{padding:3rem 5vw;background:var(--bg);color:var(--t1, #ddd)}
+.lh-keyed{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1.5rem 0}
+.lh-keyed .box{background:var(--panel);border:1px solid var(--border2);padding:0.9rem;font-size:0.85rem}
+.lh-keyed .box.on{border-color:var(--green)}
+.lh-keyed .box.stale{border-color:var(--amber)}
+.lh-keyed h4{margin:0 0 0.4rem;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3)}
+.lh-keyed .idle{color:var(--t3)}
+.lh-feed{background:var(--panel);border:1px solid var(--border2);margin-top:1rem}
+.lh-row{display:flex;justify-content:space-between;font-size:0.85rem;padding:0.5rem 1rem;border-bottom:1px solid var(--border2)}
+.lh-row .mode{color:var(--t3);font-size:0.7rem;text-transform:uppercase;width:4.5rem;flex-shrink:0}
+.lh-row .call{color:var(--green);font-weight:700;flex:1}
+.lh-row .ts{color:var(--t3);font-size:0.75rem}
+.lh-empty{color:var(--t3);font-size:0.85rem;padding:1rem}
+</style>
+<div class="lh-wrap">
+  <h1>Last Heard</h1>
+  <p style="color:var(--t3)">Rolling 3-day public window. <span id="lh-updated"></span></p>
+
+  <div class="lh-keyed" id="lh-keyed"></div>
+
+  <div class="lh-feed" id="lh-feed">
+    <div class="lh-empty">Loading…</div>
+  </div>
+</div>
+<script>
+const seedEvents = <?= json_encode($events) ?>;
+const seedKeyed  = <?= json_encode($keyed) ?>;
+
+function renderKeyed(keyed) {
+    const el = document.getElementById('lh-keyed');
+    const boxes = [];
+    const a = keyed.AllStar;
+    boxes.push(`<div class="box ${a && a.keyed ? 'on' : ''}"><h4>AllStar</h4>${a && a.keyed ? 'Online' : '<span class="idle">Offline</span>'}${a && a.last_keyed_at ? `<br><span style="color:var(--t3);font-size:0.75rem">last keyed ${a.last_keyed_at}</span>` : ''}${a ? ` <span style="color:var(--t3);font-size:0.75rem">(checked ${a.last_checked || '—'})</span>` : ''}</div>`);
+    for (const mode of ['DMR', 'P25']) {
+        const rows = keyed[mode] || [];
+        if (!rows.length) { boxes.push(`<div class="box"><h4>${mode}</h4><span class="idle">Idle</span></div>`); continue; }
+        boxes.push(rows.map(r => `<div class="box on ${r.stale ? 'stale' : ''}"><h4>${mode}${r.stale ? ' (stale?)' : ''}</h4>${r.callsign || '—'} → ${r.talkgroup || '—'}<br><span style="color:var(--t3);font-size:0.75rem">since ${r.since}</span></div>`).join(''));
+    }
+    el.innerHTML = boxes.join('');
+}
+
+function enrichSummary(e) {
+    // Namespaced by source deliberately (matches lastheard-query.php's
+    // ttn_lastheard_enrich_events()) -- radioid.net and QRZ can both
+    // return a name for the same callsign, so which source said it
+    // stays visible rather than collapsing into one ambiguous field.
+    const bits = [];
+    const en = e.enrich || {};
+    if (en.radioid && en.radioid.name) bits.push(en.radioid.name + (en.radioid.city ? ` (${en.radioid.city}, ${en.radioid.state || ''})`.replace(', )', ')') : ''));
+    else if (en.qrz && en.qrz.name) bits.push(en.qrz.name + (en.qrz.location ? ` (${en.qrz.location})` : ''));
+    if (en.allstarlink && en.allstarlink.freq) bits.push(en.allstarlink.freq + (en.allstarlink.ctcss ? ` / ${en.allstarlink.ctcss}` : ''));
+    return bits.join(' · ');
+}
+
+function renderFeed(events) {
+    const el = document.getElementById('lh-feed');
+    if (!events.length) { el.innerHTML = '<div class="lh-empty">No activity in this window.</div>'; return; }
+    el.innerHTML = events.slice(0, 50).map(e => {
+        const extra = enrichSummary(e);
+        return `
+        <div class="lh-row">
+            <span class="mode">${e.mode}</span>
+            <span class="call">${e.callsign || '—'}${e.detail ? ' → ' + e.detail : ''}${e.location ? ` <span style="color:var(--t3);font-weight:400">(${e.location})</span>` : ''}${extra ? `<br><span style="color:var(--t3);font-weight:400;font-size:0.75rem">${extra}</span>` : ''}</span>
+            <span class="ts">${e.connected_at}</span>
+        </div>`;
+    }).join('');
+}
+
+renderKeyed(seedKeyed);
+renderFeed(seedEvents);
+document.getElementById('lh-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+async function refresh() {
+    try {
+        // ASSUMPTION: fetch path -- adjust if api/ isn't served at /api/ off this page's own path.
+        const res = await fetch('/api/lastheard-feed.php?days=3');
+        if (!res.ok) return;
+        const data = await res.json();
+        renderKeyed(data.currently_keyed);
+        renderFeed(data.events);
+        document.getElementById('lh-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    } catch (e) { /* leave last good render on screen */ }
+}
+setInterval(refresh, 30000);
+</script>
+<?php require_once TTN_INCLUDES . '/footer.php'; // confirmed via grep on the live index.php (line 462) ?>
