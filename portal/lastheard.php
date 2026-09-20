@@ -33,6 +33,14 @@
  * file is required only if it's actually present on disk, so this page
  * works whether zero, some, or all three are deployed -- each source
  * activates automatically the moment its file lands in includes/.
+ *
+ * v7: callsigns are now links out to QRZ (Bobby's ask, 2026-09-20) --
+ * qrzLink() below, used everywhere a raw callsign was being interpolated
+ * (feed rows + the DMR/P25 currently-keyed boxes). Points at
+ * qrz.com/db/<CALLSIGN> -- QRZ's page there 200s and redirects to the
+ * right listing (or a not-found state) regardless of case, so no local
+ * validation of the callsign shape is attempted. Not applied to the
+ * enrichSummary() name/location bits -- those aren't callsigns.
  */
 
 require_once '/etc/ttn_config.php';
@@ -74,6 +82,8 @@ require_once TTN_INCLUDES . '/header.php'; // confirmed via grep on the live ind
 .lh-row .call{color:var(--green);font-weight:700;flex:1}
 .lh-row .ts{color:var(--t3);font-size:0.75rem}
 .lh-empty{color:var(--t3);font-size:0.85rem;padding:1rem}
+.lh-feed a.call-link,.lh-keyed a.call-link{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}
+.lh-feed a.call-link:hover,.lh-keyed a.call-link:hover{text-decoration:none;border-bottom-style:solid}
 </style>
 <div class="lh-wrap">
   <h1>Last Heard</h1>
@@ -89,6 +99,14 @@ require_once TTN_INCLUDES . '/header.php'; // confirmed via grep on the live ind
 const seedEvents = <?= json_encode($events) ?>;
 const seedKeyed  = <?= json_encode($keyed) ?>;
 
+function qrzLink(call) {
+    // Raw callsign -> a link to its QRZ.com listing. Returns the plain
+    // em-dash placeholder unchanged when there's no callsign to link.
+    if (!call) return '—';
+    const safe = String(call);
+    return `<a class="call-link" href="https://www.qrz.com/db/${encodeURIComponent(safe)}" target="_blank" rel="noopener">${safe}</a>`;
+}
+
 function renderKeyed(keyed) {
     const el = document.getElementById('lh-keyed');
     const boxes = [];
@@ -97,7 +115,7 @@ function renderKeyed(keyed) {
     for (const mode of ['DMR', 'P25']) {
         const rows = keyed[mode] || [];
         if (!rows.length) { boxes.push(`<div class="box"><h4>${mode}</h4><span class="idle">Idle</span></div>`); continue; }
-        boxes.push(rows.map(r => `<div class="box on ${r.stale ? 'stale' : ''}"><h4>${mode}${r.stale ? ' (stale?)' : ''}</h4>${r.callsign || '—'} → ${r.talkgroup || '—'}<br><span style="color:var(--t3);font-size:0.75rem">since ${r.since}</span></div>`).join(''));
+        boxes.push(rows.map(r => `<div class="box on ${r.stale ? 'stale' : ''}"><h4>${mode}${r.stale ? ' (stale?)' : ''}</h4>${qrzLink(r.callsign)} → ${r.talkgroup || '—'}<br><span style="color:var(--t3);font-size:0.75rem">since ${r.since}</span></div>`).join(''));
     }
     el.innerHTML = boxes.join('');
 }
@@ -123,7 +141,7 @@ function renderFeed(events) {
         return `
         <div class="lh-row">
             <span class="mode">${e.mode}</span>
-            <span class="call">${e.callsign || '—'}${e.detail ? ' → ' + e.detail : ''}${e.location ? ` <span style="color:var(--t3);font-weight:400">(${e.location})</span>` : ''}${extra ? `<br><span style="color:var(--t3);font-weight:400;font-size:0.75rem">${extra}</span>` : ''}</span>
+            <span class="call">${qrzLink(e.callsign)}${e.detail ? ' → ' + e.detail : ''}${e.location ? ` <span style="color:var(--t3);font-weight:400">(${e.location})</span>` : ''}${extra ? `<br><span style="color:var(--t3);font-weight:400;font-size:0.75rem">${extra}</span>` : ''}</span>
             <span class="ts">${e.connected_at}</span>
         </div>`;
     }).join('');
