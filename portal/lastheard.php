@@ -137,10 +137,14 @@ function idLink(e) {
     //  - AllStar: the connecting node number -> its AllStarLink stats
     //    node-info page. URL pattern confirmed real (stats.allstarlink.org
     //    nodeinfo.cgi?node=<n>), not guessed.
-    //  - DMR: the transmitting radio's ID -> its radioid.net record.
-    //    URL pattern confirmed real (radioid.net/database/view?id=<n>).
-    //    Falls back to the plain talkgroup (TTN's fixed hub TG, 65392)
-    //    when a row has no src_id logged.
+    //  - DMR: src_id is NOT per-talker -- confirmed 2026-09-20 fixed at
+    //    3147984 for every DMR event, the DVSwitch gateway's own constant
+    //    registration ID, not the individual radio's. Dropped the
+    //    radioid.net link (it always pointed at the same gateway record
+    //    regardless of who talked). Links to the DMR bridge leg's own
+    //    AllStarLink node-info page instead (node 1800, DVSwitch's fixed
+    //    DMR->hub leg) -- confirmed real URL pattern, honestly represents
+    //    which physical path the event came in on.
     //  - P25: TTN's P25 designator is a fixed constant (276) for every
     //    single row -- there's no per-row destination the way DMR's
     //    src_id gives one. Links to pistar.uk's P25 reflector list (a
@@ -154,10 +158,10 @@ function idLink(e) {
         return `<a class="call-link" href="http://stats.allstarlink.org/nodeinfo.cgi?node=${encodeURIComponent(e.detail)}" target="_blank" rel="noopener">${e.detail}</a>`;
     }
     if (e.mode === 'DMR') {
-        if (e.src_id) {
-            return `<a class="call-link" href="https://radioid.net/database/view?id=${encodeURIComponent(e.src_id)}" target="_blank" rel="noopener">${e.detail || e.src_id}</a>`;
+        if (e.detail) {
+            return `<a class="call-link" href="http://stats.allstarlink.org/nodeinfo.cgi?node=1800" target="_blank" rel="noopener">${e.detail}</a>`;
         }
-        return e.detail || '—';
+        return '—';
     }
     if (e.mode === 'P25' && e.detail) {
         return `<a class="call-link" href="https://www.pistar.uk/p25_reflectors.php" target="_blank" rel="noopener">${e.detail}</a>`;
