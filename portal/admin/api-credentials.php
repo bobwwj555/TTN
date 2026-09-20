@@ -39,6 +39,18 @@
  * auth.php's actual helper/session key really is. Same pattern
  * lastheard-feed.php already used for its own session check.
  *
+ * BUG FOUND AND FIXED (2026-09-20, live debugging session): the
+ * unauthenticated redirect below originally guessed `/login.php` as the
+ * login page's path. Wrong -- confirmed two ways: (1) direct browser
+ * fetch, GET /login.php -> 404, GET /admin/login.php -> 200; (2) CT713's
+ * own nginx error log, captured earlier the same session, already showed
+ * real traffic -- "POST /admin/login.php" with referrer
+ * "https://ttechnological.net/admin/login.php" -- i.e. the real login
+ * form has always lived at /admin/login.php, not /login.php. Every
+ * unauthenticated hit on this page was redirecting into a dead end,
+ * which is what read as "doesn't load." Fixed below to the confirmed
+ * real path.
+ *
  * ttn_csrf_field() IS a confirmed real function name (same security doc:
  * "ttn_csrf_field() on every form -- no exceptions"), used below as-is.
  *
@@ -63,7 +75,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 define('TTN_ADMIN_SESSION_CHECK', ($_SESSION['role'] ?? 0) >= 4);
 if (!TTN_ADMIN_SESSION_CHECK) {
-    header('Location: /login.php');
+    header('Location: /admin/login.php');
     exit;
 }
 
