@@ -21,21 +21,31 @@ $sys = db_row("
     ORDER BY sys.sort_order LIMIT 1
 ", [$site_id]);
 
-$asl_nodes = db_rows("
+// NOTE: site_api_key authenticates by SITE, not by the individual system a
+// physical node board actually belongs to. When a site has only one system
+// this was harmless. Now that a site can have more than one system (e.g.
+// the New Market/"TN" site's 2m + 440 systems), the old site_id-scoped
+// queries below blended every system's ASL nodes and interfaces into one
+// response, so a node's display could show a mix of two different radios'
+// data. Scoping to $sys['id'] (the primary system picked above) makes the
+// response internally consistent — describing one system, not a merge —
+// though it still can't distinguish which of a multi-system site's boards
+// is actually asking; that needs a per-system key/param, not just this fix.
+$system_id = $sys['id'] ?? null;
+
+$asl_nodes = $system_id ? db_rows("
     SELECT sa.asl_number, sa.node_type, sa.callsign, sa.is_hub
     FROM sys_asl sa
-    JOIN systems s ON s.id=sa.system_id
-    WHERE s.site_id=? AND sa.is_active=1
+    WHERE sa.system_id=? AND sa.is_active=1
     ORDER BY sa.is_hub DESC, sa.asl_number
-", [$site_id]);
+", [$system_id]) : [];
 
-$interfaces = db_rows("
+$interfaces = $system_id ? db_rows("
     SELECT si.label, si.url, si.interface_type, si.notes
     FROM sys_interfaces si
-    JOIN systems s ON s.id=si.system_id
-    WHERE s.site_id=? AND si.is_public=1
+    WHERE si.system_id=? AND si.is_public=1
     ORDER BY si.sort_order, si.label
-", [$site_id]);
+", [$system_id]) : [];
 
 $loc = trim(($site['city'] ? $site['city'].', ' : '').($site['state'] ?? 'TN'));
 
