@@ -22,6 +22,19 @@ $sites = db_rows("
     ORDER BY FIELD(si.status,'live','building','planned','offline'), si.phase, si.name
 ");
 
+// Guard against a site having more than one system with sort_order = 0:
+// the LEFT JOIN above matches every such row, which would otherwise
+// duplicate that site's card and double-count it in the stats below
+// (this is what caused the "TN" site to render twice, once per system,
+// and pushed Total Sites to 10 while /sites/ correctly reported 9).
+// Keep only the first (display-order) row per site id.
+$seen_site_ids = [];
+$sites = array_values(array_filter($sites, function ($s) use (&$seen_site_ids) {
+    if (isset($seen_site_ids[$s['id']])) return false;
+    $seen_site_ids[$s['id']] = true;
+    return true;
+}));
+
 $live_count    = count(array_filter($sites, fn($s) => $s['status'] === 'live'));
 $build_count   = count(array_filter($sites, fn($s) => $s['status'] === 'building'));
 $planned_count = count(array_filter($sites, fn($s) => $s['status'] === 'planned'));
