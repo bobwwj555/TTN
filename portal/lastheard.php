@@ -100,6 +100,7 @@ require_once TTN_INCLUDES . '/header.php'; // confirmed via grep on the live ind
 .lh-table tbody tr:hover td{background:rgba(255,255,255,0.03)}
 .lh-table .mode{color:var(--t3);font-size:0.7rem;text-transform:uppercase;white-space:nowrap}
 .lh-table .idcol{white-space:nowrap;font-variant-numeric:tabular-nums}
+.lh-table .via{white-space:nowrap;color:var(--t3);font-size:0.8rem}
 .lh-table .call{color:var(--green);font-weight:700;white-space:nowrap}
 .lh-table .ts{color:var(--t3);font-size:0.75rem;white-space:nowrap;font-variant-numeric:tabular-nums}
 .lh-table .desc{color:var(--t1, #ddd)}
@@ -169,6 +170,23 @@ function idLink(e) {
     return e.detail || '—';
 }
 
+function viaLabel(e) {
+    // ECR's Node#/Via structure -- Via is the connecting path a row came
+    // in on. AllStar: the connecting node itself (same identity as the ID
+    // column -- TTN is single-hop, so these legitimately match, same as
+    // most of ECR's own AllStar rows). DMR/P25: the fixed DVSwitch bridge
+    // leg every event of that mode passes through (see idLink()'s comment
+    // above for why there's no per-event distinction possible beyond mode
+    // -- confirmed 2026-09-20, src_id is a constant gateway ID, not
+    // per-talker).
+    if (e.mode === 'AllStar') {
+        return e.detail ? `Node ${e.detail}` : '—';
+    }
+    if (e.mode === 'DMR') return 'DMR bridge';
+    if (e.mode === 'P25') return 'P25 bridge';
+    return '—';
+}
+
 function renderKeyed(keyed) {
     const el = document.getElementById('lh-keyed');
     const boxes = [];
@@ -208,13 +226,14 @@ function renderFeed(events) {
         <tr>
             <td class="mode">${e.mode}</td>
             <td class="idcol">${idLink(e)}</td>
+            <td class="via">${viaLabel(e)}</td>
             <td class="call">${qrzLink(e.callsign)}</td>
             <td class="ts">${e.connected_at}</td>
             <td class="desc">${locHtml}${extraHtml}</td>
         </tr>`;
     }).join('');
     el.innerHTML = `<table class="lh-table">
-        <thead><tr><th>Type</th><th>ID</th><th>Callsign</th><th>Time (UTC)</th><th>Details</th></tr></thead>
+        <thead><tr><th>Type</th><th>ID</th><th>Via</th><th>Callsign</th><th>Time (UTC)</th><th>Details</th></tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
 }
