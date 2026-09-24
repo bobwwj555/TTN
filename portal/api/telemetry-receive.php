@@ -1,12 +1,12 @@
 <?php
 /**
  * TTN Telemetry Receive API
- * LOCATION: /home/obdswlpx/dev.ttn.radio/api/telemetry-receive.php
+ * LOCATION: portal/api/telemetry-receive.php in the TTN repo, deployed to
+ * /var/www/html/api/telemetry-receive.php on CT713 via ttn-deploy.
  *
- * Receives POST from ttn-logger.php on node servers
- * Validates shared secret
- * Writes telemetry snapshots to sys_telemetry table
- * Logs connection events for history
+ * Receives POST from ttn-logger.php (TTN Node Telemetry Agent) on node
+ * servers. Validates shared secret. Writes telemetry snapshots to
+ * sys_telemetry table. Logs connection events to conn_log for history.
  */
 
 require_once '/etc/ttn_config.php';
@@ -21,13 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// IP whitelist — pulled from asl_servers, no hardcoding
-// New sites get access automatically when added to Admin → Network → ASL Servers
-$allowed_ips = array_column(
-    db_rows("SELECT ip_address FROM asl_servers WHERE ip_address IS NOT NULL AND ip_address != '' AND is_active = 1"),
-    'ip_address'
-);
-// IP check disabled — all traffic proxied through NPM (172.20.7.9), secret is the auth
+// IP allowlisting is intentionally not enforced here -- all traffic is
+// proxied through NPM (172.20.7.9), so the shared secret below is the
+// actual auth boundary, not source IP. (An unused $allowed_ips query
+// against asl_servers used to sit here and was never checked -- removed
+// as dead code, 2026-09-20.)
 
 // Validate secret — from header or body
 $secret_header = $_SERVER['HTTP_X_TTN_SECRET'] ?? '';

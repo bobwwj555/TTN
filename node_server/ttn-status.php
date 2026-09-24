@@ -1,10 +1,11 @@
 <?php
 /**
  * TTN Node Status Proxy — ASL3 Edition
- * LOCATION: /var/www/html/ttn-status.php  (on tn.w4bww.net)
  *
- * Serves cached data from ttn-logger.php cron first (fast path).
- * Falls back to live AMI poll using ASL3 XStat/SawStat commands.
+ * Serves cached data from ttn-logger.php's cron output first (fast path).
+ * Falls back to a live AMI poll using ASL3 XStat/SawStat commands. Part of
+ * the TTN Node Telemetry Agent package -- see README.md and install.sh in
+ * this directory for setup.
  *
  * Usage: /ttn-status.php?node=450330
  */

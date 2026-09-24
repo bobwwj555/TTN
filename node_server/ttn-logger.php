@@ -1,10 +1,14 @@
 <?php
 /**
  * TTN Node Logger — ASL3 Edition
- * LOCATION: /var/www/html/ttn-logger.php  (on tn.w4bww.net)
  *
- * Run via cron every minute (as www-data):
- *   */5 * * * * /usr/bin/php /var/www/html/ttn-logger.php >> /var/log/ttn-logger.log 2>&1
+ * Polls this node server's AllStarLink node(s) over AMI and POSTs a status
+ * snapshot to the TTN portal. Part of the TTN Node Telemetry Agent package
+ * -- see README.md and install.sh in this directory for setup.
+ *
+ * Runs every 5 minutes via a www-data cron job (installed automatically by
+ * install.sh -- see README.md for the exact crontab line; not reproduced
+ * here since its literal syntax breaks a block comment like this one).
  *
  * ASL3 AMI commands used:
  *   ACTION: RptStatus / COMMAND: XStat   — connections, keyed state, direction
