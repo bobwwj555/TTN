@@ -57,6 +57,22 @@
  * daemon notes) -- if that backend change ISN'T deployed, this just
  * means more frequent polls of the same 5-minute-stale data, worth
  * reverting if so.
+ *
+ * v9 (2026-09-26, later same day): the 5s poll/fetch/re-render loop
+ * below (refresh(), setInterval) was already live as of v8 -- this
+ * round didn't build it from scratch, it hardened and extended it.
+ * Two changes: (1) refresh()'s catch block was silent -- any real
+ * failure (bad fetch path, a render-shape mismatch) left the page
+ * frozen on its last good render with no visible signal at all,
+ * indistinguishable from "nothing new happened"; now logs to the
+ * console instead. (2) renderKeyed() updated to match
+ * ttn_lastheard_currently_keyed()'s AllStar branch switching from
+ * sys_telemetry to ptt_log (lastheard-query.php v8) -- AllStar's shape
+ * changed from a single object-or-null to a list, so it now renders
+ * through the same per-mode loop as DMR/P25 instead of being
+ * special-cased. Fetch path (`/api/lastheard-feed.php`) and 5000ms
+ * interval left unchanged -- both already confirmed correct against
+ * the real deploy layout and the live API this same session.
  */
 
 require_once '/etc/ttn_config.php';
@@ -188,14 +204,23 @@ function viaLabel(e) {
 }
 
 function renderKeyed(keyed) {
+    // v9: AllStar switched from a single object-or-null (sys_telemetry's
+    // one hub-wide "online?" reading) to a list, matching ptt_log's real
+    // per-node granularity and DMR/P25's existing shape below -- see
+    // ttn_lastheard_currently_keyed()'s own comment (lastheard-query.php)
+    // for why. All three modes now render through the same loop instead
+    // of AllStar being special-cased.
     const el = document.getElementById('lh-keyed');
     const boxes = [];
-    const a = keyed.AllStar;
-    boxes.push(`<div class="box ${a && a.keyed ? 'on' : ''}"><h4>AllStar</h4>${a && a.keyed ? 'Online' : '<span class="idle">Offline</span>'}${a && a.last_keyed_at ? `<br><span style="color:var(--t3);font-size:0.75rem">last keyed ${a.last_keyed_at}</span>` : ''}${a ? ` <span style="color:var(--t3);font-size:0.75rem">(checked ${a.last_checked || '—'})</span>` : ''}</div>`);
-    for (const mode of ['DMR', 'P25']) {
+    for (const mode of ['AllStar', 'DMR', 'P25']) {
         const rows = keyed[mode] || [];
         if (!rows.length) { boxes.push(`<div class="box"><h4>${mode}</h4><span class="idle">Idle</span></div>`); continue; }
-        boxes.push(rows.map(r => `<div class="box on ${r.stale ? 'stale' : ''}"><h4>${mode}${r.stale ? ' (stale?)' : ''}</h4>${qrzLink(r.callsign)} → ${r.talkgroup || '—'}<br><span style="color:var(--t3);font-size:0.75rem">since ${r.since}</span></div>`).join(''));
+        boxes.push(rows.map(r => {
+            const label = mode === 'AllStar'
+                ? (r.callsign ? `${qrzLink(r.callsign)} (node ${r.asl_number})` : `Node ${r.asl_number}`)
+                : `${qrzLink(r.callsign)} → ${r.talkgroup || '—'}`;
+            return `<div class="box on ${r.stale ? 'stale' : ''}"><h4>${mode}${r.stale ? ' (stale?)' : ''}</h4>${label}<br><span style="color:var(--t3);font-size:0.75rem">since ${r.since}</span></div>`;
+        }).join(''));
     }
     el.innerHTML = boxes.join('');
 }
@@ -251,7 +276,16 @@ async function refresh() {
         renderKeyed(data.currently_keyed);
         renderFeed(data.events);
         document.getElementById('lh-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
-    } catch (e) { /* leave last good render on screen */ }
+    } catch (e) {
+        // v9: was a silent catch -- a real failure here (bad fetch path,
+        // a render-shape mismatch, anything) left the page frozen on its
+        // last good render with zero visible signal, indistinguishable
+        // from "nothing new happened." Logging it doesn't fix a failure,
+        // but a page that's been silently stuck for hours is a real
+        // symptom worth being able to catch from the browser console
+        // instead of guessing blind.
+        console.error('[lastheard] refresh failed, keeping last good render:', e);
+    }
 }
 // 5s, down from 30s -- paired with the proposed systemd log-tailer
 // daemon (replaces the 5-min cron) so the page's own staleness stops

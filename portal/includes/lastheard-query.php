@@ -34,6 +34,16 @@
  * claude/TTN_Session_Update_2026-09-25_1940.md). Replaced, not unioned,
  * per Bobby's explicit direction. Full reasoning is inline in
  * ttn_lastheard_events() below, next to the new query.
+ *
+ * v8 (2026-09-26, later same day): the follow-up v7 itself flagged --
+ * ttn_lastheard_currently_keyed()'s AllStar branch switched from
+ * sys_telemetry (is_online -- "is the AMI connection up") to ptt_log
+ * (is someone actually transmitting right now). AllStar's shape in the
+ * return array changed from a single object-or-null to a list, matching
+ * DMR/P25's existing shape -- see that function's own comment for why.
+ * lastheard.php's renderKeyed() is updated in the same patch to match;
+ * a mismatched shape there would silently break (or blank) the AllStar
+ * box.
  */
 
 function ttn_lastheard_events(int $days): array {
@@ -231,36 +241,61 @@ function ttn_lastheard_enrich_events(array &$events): void {
 }
 
 function ttn_lastheard_currently_keyed(): array {
-    $keyed = ['AllStar' => null, 'DMR' => [], 'P25' => []];
+    $keyed = ['AllStar' => [], 'DMR' => [], 'P25' => []];
 
-    // sys_telemetry columns confirmed live: id, system_id, recorded_at,
-    // is_online, last_keyed_at, connected_nodes, recording_url. No
-    // is_keyed/status/updated_at -- those were wrong guesses in v1-v3.
-    // 'keyed' uses is_online as the base signal; last_keyed_at is
-    // exposed separately so the page can show "last keyed at <time>"
-    // even when currently offline, rather than collapsing the two into
-    // one boolean.
-    //
-    // NOT switched to ptt_log in v7 -- out of scope for the fix asked
-    // for this round (that was specifically about ttn_lastheard_events()
-    // going stale, not this function), and is_online here answers a
-    // different question (is the node's AMI connection up at all) than
-    // ptt_log would (is someone transmitting right now). Worth a
-    // follow-up: a true ptt_log-based "currently keyed" would need to
-    // find, per node, the most recent row and check whether it's a
-    // 'key' with no later 'unkey' -- flagging as a real next step, not
-    // doing it here since it wasn't asked for.
+    // v8: switched from sys_telemetry (is_online -- "is the node's AMI
+    // connection up at all") to ptt_log (is someone actually
+    // transmitting right now) -- these are genuinely different
+    // questions, and is_online was never the right signal for a
+    // "currently keyed" indicator, just the closest thing available
+    // before ptt_log existed. "Currently keyed" here means: for a given
+    // asl_number, its own most recent ptt_log row is 'key' with no later
+    // 'unkey' -- found via a per-asl_number MAX(event_time) join rather
+    // than a correlated subquery, same latest-row-per-group pattern as
+    // any other grouped-latest query. Returned as a list, not a single
+    // object -- unlike sys_telemetry (one hub-wide row), ptt_log tracks
+    // each watched node individually, and more than one could show as
+    // still-keyed at once (e.g. a brief AMI doubling), which a single
+    // object couldn't represent honestly. Mirrors DMR/P25's existing
+    // list shape and stale-after-5-minutes convention below, for the
+    // same reason: a 'key' with no 'unkey' seen in a long time is more
+    // likely a missed end event than someone still transmitting.
+    // sys_asl LEFT JOIN (not INNER) deliberately -- an unresolved
+    // asl_number should still show as keyed, just without a callsign,
+    // rather than silently vanishing from the box.
     try {
-        $t = db_row("SELECT * FROM sys_telemetry WHERE system_id = ? ORDER BY recorded_at DESC LIMIT 1", [TTN_HUB_SYSTEM_ID]);
-        if ($t) {
-            $keyed['AllStar'] = [
-                'keyed'         => !empty($t['is_online']),
-                'last_keyed_at' => $t['last_keyed_at'] ?? null,
-                'last_checked'  => $t['recorded_at'] ?? null,
+        $rows = db_rows("
+            SELECT p.asl_number, a.callsign, p.event_time AS since
+            FROM ptt_log p
+            INNER JOIN (
+                SELECT asl_number, MAX(event_time) AS max_time
+                FROM ptt_log
+                GROUP BY asl_number
+            ) latest ON latest.asl_number = p.asl_number AND latest.max_time = p.event_time
+            LEFT JOIN sys_asl a ON a.asl_number = p.asl_number
+            WHERE p.direction = 'key'
+        ");
+        $seen = [];
+        foreach ($rows as $r) {
+            // A tied event_time for the same asl_number (confirmed to
+            // happen for real tonight -- node 40245 logged several
+            // identical-second rows) would otherwise join-match more
+            // than once here and list the same node twice. Keep the
+            // first, skip the rest, rather than relying on GROUP BY
+            // behavior that depends on this server's sql_mode.
+            if (isset($seen[$r['asl_number']])) {
+                continue;
+            }
+            $seen[$r['asl_number']] = true;
+            $keyed['AllStar'][] = [
+                'asl_number' => $r['asl_number'],
+                'callsign'   => $r['callsign'] ?: null,
+                'since'      => $r['since'],
+                'stale'      => (time() - strtotime($r['since'])) > 300,
             ];
         }
     } catch (\Throwable $e) {
-        error_log('[lastheard] sys_telemetry query failed (check column names): ' . $e->getMessage());
+        error_log('[lastheard] AllStar ptt_log currently-keyed query failed (check ptt_log/sys_asl column names): ' . $e->getMessage());
     }
 
     // disconnected_at IS NULL is a "no end event seen yet" proxy, not a
