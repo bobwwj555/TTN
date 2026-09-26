@@ -82,6 +82,16 @@
  * should point at the network's own authoritative record, not TTN's
  * internal bridge plumbing. See idLink()'s comment below for why this
  * links to the bare page rather than a per-talkgroup deep link.
+ *
+ * v11 (2026-09-26, later same day): renderFeed()'s DMR/P25 rows now
+ * show "Relayed from AllStar node <n>" when lastheard-query.php's
+ * ttn_lastheard_events() (v10) tagged them with a `relayed_from` node --
+ * confirmed live this session, against a full day's real data, that
+ * these ARE a genuine event-triggered relay through the DVSwitch bridge
+ * (not an independent heartbeat off the gateway's own link status), so
+ * per Bobby's own root-node principle a relayed leg needs to say what
+ * triggered it rather than sitting there looking like an unrelated,
+ * independent origination.
  */
 
 require_once '/etc/ttn_config.php';
@@ -272,6 +282,16 @@ function renderFeed(events) {
         const extra = enrichSummary(e);
         const locHtml = e.location ? `<div class="sub">${e.location}</div>` : '';
         const extraHtml = extra ? `<div class="sub">${extra}</div>` : '';
+        // v11: DMR/P25 rows relayed from a real AllStar keyup (confirmed
+        // live this session as a genuine event-triggered relay through
+        // the DVSwitch bridge, not an independent heartbeat -- see
+        // ttn_lastheard_events()'s comment) show which node triggered
+        // them, per Bobby's root-node principle: this is the SAME event
+        // crossing the bridge, not an unrelated origination, and the row
+        // needs to say so rather than sitting there bare and unlinked.
+        const relayHtml = e.relayed_from
+            ? `<div class="sub">Relayed from <a class="call-link" href="http://stats.allstarlink.org/nodeinfo.cgi?node=${encodeURIComponent(e.relayed_from)}" target="_blank" rel="noopener">AllStar node ${e.relayed_from}</a></div>`
+            : '';
         return `
         <tr>
             <td class="mode">${e.mode}</td>
@@ -279,7 +299,7 @@ function renderFeed(events) {
             <td class="via">${viaLabel(e)}</td>
             <td class="call">${qrzLink(e.callsign)}</td>
             <td class="ts">${e.connected_at}</td>
-            <td class="desc">${locHtml}${extraHtml}</td>
+            <td class="desc">${locHtml}${extraHtml}${relayHtml}</td>
         </tr>`;
     }).join('');
     el.innerHTML = `<table class="lh-table">

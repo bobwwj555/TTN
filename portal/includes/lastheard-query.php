@@ -44,6 +44,21 @@
  * lastheard.php's renderKeyed() is updated in the same patch to match;
  * a mismatched shape there would silently break (or blank) the AllStar
  * box.
+ *
+ * v9 (2026-09-26, later same day): ttn_lastheard_currently_keyed()'s
+ * `stale` flag now excludes a row instead of just labeling it -- a
+ * missed end event (a 'key'/open connection with no matching
+ * 'unkey'/disconnect for >5min) isn't a real live keyup, confirmed live
+ * against node 40245 sitting "currently keyed" for 20+ minutes off one
+ * missed unkey. See that function's own comment for the incident.
+ *
+ * v10 (2026-09-26, later same day): ttn_lastheard_events()'s DMR/P25
+ * rows now carry a `relayed_from` field naming the AllStar node that
+ * triggered them, when one keyed shortly before -- confirmed against a
+ * full day's real data that these are a genuine event-triggered relay
+ * through the DVSwitch bridge, not an independent heartbeat. See that
+ * function's own comment for the evidence. lastheard.php's renderFeed()
+ * is updated in the same patch to display it.
  */
 
 function ttn_lastheard_events(int $days): array {
@@ -159,6 +174,55 @@ function ttn_lastheard_events(int $days): array {
             error_log("[lastheard] {$mode} query failed (check ttn_topology grant on this connection's DB user): " . $e->getMessage());
         }
     }
+
+    // v10 (2026-09-26, later same day): DMR/P25 rows tagged with the
+    // AllStar keyup that triggered them, when one exists shortly before.
+    // Confirmed against a full day's real data this session (63 of 65
+    // DMR/P25 pairs had an AllStar 'key' event 0-63s earlier) that these
+    // are a REAL, event-triggered relay through the DVSwitch bridge --
+    // NOT an independent heartbeat: a ~1h47m AllStar-quiet stretch that
+    // same day had zero DMR/P25 rows at all, which a fixed-interval timer
+    // would have fired through dozens of times. Delay is consistently
+    // ~62-63s when the triggering AllStar event is isolated, collapsing
+    // to near-zero during rapid bursts -- the signature of a real audio
+    // pipeline's baseline hang time being absorbed once already primed by
+    // nearby traffic, not a periodic echo. Per Bobby's own root-node
+    // principle (already applied to the currently-keyed box this
+    // session): a relayed leg is the SAME event as its origin, not an
+    // independent origination, and the feed needs to say so instead of
+    // showing three unrelated-looking rows for one real keyup.
+    //
+    // 90s window (comfortably above the observed ~62-63s ceiling).
+    // Attributes to the MOST RECENT preceding AllStar event within that
+    // window, not the first -- during a burst of several closely-spaced
+    // AllStar keys before one relay pair, the relay reflects whatever was
+    // most recently on the air, not the start of the burst. A DMR/P25
+    // event with no AllStar event in its window gets no tag at all --
+    // confirmed live that this happens for real (2 of 65 pairs today, both
+    // before any AllStar activity that day), and forcing an attribution
+    // there would fabricate a link that isn't there.
+    $allstar_times = [];
+    foreach ($events as $e) {
+        if ($e['mode'] === 'AllStar') {
+            $allstar_times[] = ['t' => strtotime($e['connected_at']), 'node' => $e['detail']];
+        }
+    }
+    foreach ($events as &$e) {
+        if ($e['mode'] !== 'DMR' && $e['mode'] !== 'P25') {
+            continue;
+        }
+        $et = strtotime($e['connected_at']);
+        $best = null;
+        foreach ($allstar_times as $a) {
+            if ($a['t'] <= $et && ($et - $a['t']) <= 90) {
+                if ($best === null || $a['t'] > $best['t']) {
+                    $best = $a;
+                }
+            }
+        }
+        $e['relayed_from'] = $best ? $best['node'] : null;
+    }
+    unset($e);
 
     ttn_lastheard_enrich_events($events);
 
