@@ -73,6 +73,15 @@
  * special-cased. Fetch path (`/api/lastheard-feed.php`) and 5000ms
  * interval left unchanged -- both already confirmed correct against
  * the real deploy layout and the live API this same session.
+ *
+ * v10 (2026-09-26, later same day): DMR entries (feed table ID column
+ * and the currently-keyed box) now link out to TGIF's own last-heard
+ * page (tgif.network/lastheard.php) instead of the DVSwitch bridge
+ * leg's AllStarLink node-info page (node 1800) -- Bobby's ask: TGIF is
+ * TTN's confirmed actual DMR network, not BrandMeister, so DMR entries
+ * should point at the network's own authoritative record, not TTN's
+ * internal bridge plumbing. See idLink()'s comment below for why this
+ * links to the bare page rather than a per-talkgroup deep link.
  */
 
 require_once '/etc/ttn_config.php';
@@ -156,12 +165,19 @@ function idLink(e) {
     //    nodeinfo.cgi?node=<n>), not guessed.
     //  - DMR: src_id is NOT per-talker -- confirmed 2026-09-20 fixed at
     //    3147984 for every DMR event, the DVSwitch gateway's own constant
-    //    registration ID, not the individual radio's. Dropped the
-    //    radioid.net link (it always pointed at the same gateway record
-    //    regardless of who talked). Links to the DMR bridge leg's own
-    //    AllStarLink node-info page instead (node 1800, DVSwitch's fixed
-    //    DMR->hub leg) -- confirmed real URL pattern, honestly represents
-    //    which physical path the event came in on.
+    //    registration ID, not the individual radio's. Previously linked
+    //    to the DMR bridge leg's own AllStarLink node-info page (node
+    //    1800) -- technically accurate (that IS the physical path the
+    //    event came in on) but not what Bobby actually wants here: TGIF
+    //    is TTN's confirmed real DMR network (not BrandMeister), so this
+    //    now links to TGIF's own last-heard page instead, matching DMR
+    //    entries to the network's own authoritative record rather than
+    //    TTN's internal bridge-leg plumbing. tgif.network/lastheard.php
+    //    confirmed live (2026-09-26 WebFetch) but with no visible
+    //    per-talkgroup query parameter (?tg=, ?talkgroup=, or similar) --
+    //    links to the page itself rather than guessing a deep-link URL
+    //    shape on a public, grant-facing page. Worth revisiting if TGIF's
+    //    own filter/URL scheme gets confirmed later.
     //  - P25: TTN's P25 designator is a fixed constant (276) for every
     //    single row -- there's no per-row destination the way DMR's
     //    src_id gives one. Links to pistar.uk's P25 reflector list (a
@@ -176,7 +192,7 @@ function idLink(e) {
     }
     if (e.mode === 'DMR') {
         if (e.detail) {
-            return `<a class="call-link" href="http://stats.allstarlink.org/nodeinfo.cgi?node=1800" target="_blank" rel="noopener">${e.detail}</a>`;
+            return `<a class="call-link" href="https://tgif.network/lastheard.php" target="_blank" rel="noopener">${e.detail}</a>`;
         }
         return '—';
     }
@@ -216,9 +232,18 @@ function renderKeyed(keyed) {
         const rows = keyed[mode] || [];
         if (!rows.length) { boxes.push(`<div class="box"><h4>${mode}</h4><span class="idle">Idle</span></div>`); continue; }
         boxes.push(rows.map(r => {
+            // v10: DMR's talkgroup number now links out to TGIF's own
+            // last-heard page (Bobby's ask, 2026-09-26) -- TGIF is TTN's
+            // confirmed real DMR network, not BrandMeister. Matches the
+            // same link added to idLink() below for the feed table's DMR
+            // rows -- see that function's comment for why this links to
+            // the bare page rather than a per-talkgroup URL.
+            const tgLabel = mode === 'DMR' && r.talkgroup
+                ? `<a class="call-link" href="https://tgif.network/lastheard.php" target="_blank" rel="noopener">${r.talkgroup}</a>`
+                : (r.talkgroup || '—');
             const label = mode === 'AllStar'
                 ? (r.callsign ? `${qrzLink(r.callsign)} (node ${r.asl_number})` : `Node ${r.asl_number}`)
-                : `${qrzLink(r.callsign)} → ${r.talkgroup || '—'}`;
+                : `${qrzLink(r.callsign)} → ${tgLabel}`;
             return `<div class="box on ${r.stale ? 'stale' : ''}"><h4>${mode}${r.stale ? ' (stale?)' : ''}</h4>${label}<br><span style="color:var(--t3);font-size:0.75rem">since ${r.since}</span></div>`;
         }).join(''));
     }
