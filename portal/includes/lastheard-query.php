@@ -243,6 +243,31 @@ function ttn_lastheard_enrich_events(array &$events): void {
 function ttn_lastheard_currently_keyed(): array {
     $keyed = ['AllStar' => [], 'DMR' => [], 'P25' => []];
 
+    // v9 (2026-09-26, later same day): confirmed live -- node 40245 had a
+    // 'key' row from ~23 minutes earlier with no matching 'unkey' ever
+    // logged (a missed end event, exactly the case `stale` already exists
+    // to detect), and it was rendering as "currently keyed" in the
+    // AllStar box the entire time, indistinguishable from a real
+    // transmission except for a small "(stale?)" label. Per Bobby's
+    // ECR-parity ask -- one box per REAL keyup -- a stale entry like this
+    // isn't a real keyup at all, it's known-likely-wrong data, so `stale`
+    // now excludes a row from the returned list instead of just labeling
+    // it in place. This was very likely the real explanation for "5 nodes
+    // keyed at once" off a single real transmission: several unrelated
+    // missed-end-event ghosts (any node with a never-closed 'key' row,
+    // for whatever earlier reason) rendering alongside one real live
+    // keyup in the same box, not an AllStar linking/relay-chain issue --
+    // confirmed by ptt_log itself showing only the single real node
+    // (450331) during two live test keyups tonight, with 40245's stale
+    // ghost the only other entry the old code would have shown alongside
+    // it. Applied to all three modes for the same reason -- DMR/P25's
+    // open-row query has the identical missed-disconnect-event gap.
+    // NOTE: this is a display filter only, not a data fix -- 40245's
+    // stale ptt_log row (and any others like it) stays in the table and
+    // will simply stop being surfaced once this deploys; no DELETE
+    // needed for this to take effect, though the row itself remains if a
+    // later audit of ptt_log's write-side ever wants to know it happened.
+    //
     // v8: switched from sys_telemetry (is_online -- "is the node's AMI
     // connection up at all") to ptt_log (is someone actually
     // transmitting right now) -- these are genuinely different
@@ -287,11 +312,21 @@ function ttn_lastheard_currently_keyed(): array {
                 continue;
             }
             $seen[$r['asl_number']] = true;
+            // v9: a stale (>5min, no matching unkey) row is a missed end
+            // event, not a real live keyup -- excluded entirely rather
+            // than shown with just a cosmetic label. See this function's
+            // v9 comment above for the incident that surfaced this.
+            if ((time() - strtotime($r['since'])) > 300) {
+                continue;
+            }
             $keyed['AllStar'][] = [
                 'asl_number' => $r['asl_number'],
                 'callsign'   => $r['callsign'] ?: null,
                 'since'      => $r['since'],
-                'stale'      => (time() - strtotime($r['since'])) > 300,
+                // No 'stale' key -- every remaining row is already <5min
+                // old (older ones were filtered above), and lastheard.php's
+                // renderKeyed() treats a missing/falsy r.stale the same as
+                // an explicit false, so no client-side change is needed.
             ];
         }
     } catch (\Throwable $e) {
@@ -300,9 +335,11 @@ function ttn_lastheard_currently_keyed(): array {
 
     // disconnected_at IS NULL is a "no end event seen yet" proxy, not a
     // real live signal -- DMR/P25 have no live query interface, same
-    // reason the logger tails a log file instead of polling. `stale`
-    // flags "open longer than one ~5min cron cycle" so the UI can hint
-    // "probably still keyed" vs. "probably a missed end event."
+    // reason the logger tails a log file instead of polling. v9: same
+    // change as AllStar above -- a row open >5min is a missed disconnect
+    // event, not a real live one, so it's excluded here rather than shown
+    // with a "(stale?)" label. See ttn_lastheard_currently_keyed()'s v9
+    // comment for the incident that motivated this across all three modes.
     foreach (['DMR' => 'ttn_topology.dmr_conn_log', 'P25' => 'ttn_topology.p25_conn_log'] as $mode => $table) {
         try {
             $open = db_rows("
@@ -311,11 +348,13 @@ function ttn_lastheard_currently_keyed(): array {
                 ORDER BY connected_at DESC
             ", [TTN_HUB_SYSTEM_ID]);
             foreach ($open as $o) {
+                if ((time() - strtotime($o['connected_at'])) > 300) {
+                    continue;
+                }
                 $keyed[$mode][] = [
                     'callsign'  => $o['callsign'],
                     'talkgroup' => $o['talkgroup'],
                     'since'     => $o['connected_at'],
-                    'stale'     => (time() - strtotime($o['connected_at'])) > 300,
                 ];
             }
         } catch (\Throwable $e) {
