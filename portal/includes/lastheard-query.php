@@ -67,7 +67,40 @@
  * Display-layer fix only; the write-side cause is separate and needs
  * its own fix on a different host/deploy path. See that function's own
  * comment for the confirmed evidence.
+ *
+ * v12 (2026-09-26, later same day): a registered sys_asl callsign
+ * ending in "-L" (EchoLink's own link/proxy-node convention -- see
+ * ttn_is_link_node_callsign() below) is never shown as that node's
+ * live occupant, in either ttn_lastheard_currently_keyed()'s AllStar
+ * box or ttn_lastheard_events()'s relay-attribution tagging. Confirmed
+ * live: node 1900 ("W4BWW-L", Bobby's own EchoLink link node) alternated
+ * key/unkey in lockstep with node 450331 for an entire real two-way
+ * EchoLink QSO -- both the currently-keyed box and the relay tagging
+ * were crediting BOTH sides of that conversation to Bobby, since a link
+ * node's sys_asl row records who set it up, not who's occupying it at
+ * any given moment (the same distinction already forced on DMR's fixed
+ * src_id/node 1800 earlier this session). This is the interim fix Bobby
+ * asked for: stop crediting the owner, don't fabricate a real remote
+ * callsign. Real per-occupant attribution needs Asterisk/app_rpt's own
+ * EchoLink connection tracking (AMI status or its own connect/disconnect
+ * log) -- not reachable from this session yet, still open.
  */
+
+/**
+ * A sys_asl callsign ending in "-L" is a Link-type registration --
+ * EchoLink's own convention for a bridge/proxy node a ham sets up,
+ * distinct from their own live PTT (confirmed against echolink.org's
+ * validation lookup for W4BWW: three separate registered nodes under
+ * one callsign, W4BWW/base, W4BWW-L/link, W4BWW-R/repeater). A link
+ * node's registered owner is who configured it, not necessarily who's
+ * occupying it right now -- see this file's v12 header note for the
+ * confirmed incident that made this the authoritative signal instead of
+ * a guess (previously flagged in ttn_lastheard_enrich_events() below as
+ * blocked on exactly this unresolved question).
+ */
+function ttn_is_link_node_callsign(?string $callsign): bool {
+    return $callsign !== null && preg_match('/-L$/', trim($callsign)) === 1;
+}
 
 function ttn_lastheard_events(int $days): array {
     $since = date('Y-m-d H:i:s', strtotime("-{$days} days"));
@@ -243,11 +276,51 @@ function ttn_lastheard_events(int $days): array {
     // confirmed live that this happens for real (2 of 65 pairs today, both
     // before any AllStar activity that day), and forcing an attribution
     // there would fabricate a link that isn't there.
+    // v12: a link-type node (ttn_is_link_node_callsign()) is excluded
+    // from the public AllStar query above by the visibility/is_active
+    // filter -- confirmed live that node 1900 ("W4BWW-L") required a
+    // raw, filter-free query to find at all, meaning $events never
+    // carried its key events and the tagging loop below could only ever
+    // fall back to whichever OTHER AllStar node (e.g. 450331) happened
+    // to be nearby in time -- silently misattributing a relay actually
+    // triggered by the EchoLink leg to that node's owner instead. This
+    // unconditional query exists ONLY to feed relay-attribution timing
+    // below; it deliberately does not add rows to $events (a link node's
+    // own key events aren't shown as their own feed row here -- out of
+    // scope for tonight's fix, see chat).
+    $link_node_times = [];
+    try {
+        $link_rows = db_rows("
+            SELECT p.asl_number AS node, a.callsign AS callsign, p.event_time AS connected_at
+            FROM ptt_log p
+            INNER JOIN sys_asl a ON a.asl_number = p.asl_number
+            WHERE p.direction = 'key' AND p.event_time >= ? AND a.callsign LIKE '%-L'
+            ORDER BY p.event_time DESC
+        ", [$since]);
+        foreach ($link_rows as $r) {
+            if (ttn_is_link_node_callsign($r['callsign'])) {
+                $link_node_times[] = ['t' => strtotime($r['connected_at']), 'node' => $r['node']];
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log('[lastheard] link-node relay-timing query failed: ' . $e->getMessage());
+    }
+
     $allstar_times = [];
     foreach ($events as $e) {
         if ($e['mode'] === 'AllStar') {
-            $allstar_times[] = ['t' => strtotime($e['connected_at']), 'node' => $e['detail']];
+            $allstar_times[] = [
+                't' => strtotime($e['connected_at']),
+                'node' => $e['detail'],
+                // Defensive -- if a link node's row ever does pass the
+                // public/active filter above and lands in $events
+                // directly, it still gets the same treatment.
+                'is_link_node' => ttn_is_link_node_callsign($e['callsign']),
+            ];
         }
+    }
+    foreach ($link_node_times as $l) {
+        $allstar_times[] = ['t' => $l['t'], 'node' => $l['node'], 'is_link_node' => true];
     }
     foreach ($events as &$e) {
         if ($e['mode'] !== 'DMR' && $e['mode'] !== 'P25') {
@@ -262,7 +335,24 @@ function ttn_lastheard_events(int $days): array {
                 }
             }
         }
-        $e['relayed_from'] = $best ? $best['node'] : null;
+        if ($best === null) {
+            $e['relayed_from'] = null;
+            $e['relayed_via_link_node'] = null;
+        } elseif ($best['is_link_node']) {
+            // v12: the actual trigger was a link node (e.g. Bobby's own
+            // EchoLink proxy, node 1900) -- crediting this to whichever
+            // real AllStar node happens to be nearby in time would
+            // misattribute the OTHER station's half of a relayed
+            // conversation to that node's owner (the confirmed incident
+            // this round -- see file header). Tagged separately so the
+            // display can say "remote station unknown" instead of naming
+            // anyone.
+            $e['relayed_from'] = null;
+            $e['relayed_via_link_node'] = $best['node'];
+        } else {
+            $e['relayed_from'] = $best['node'];
+            $e['relayed_via_link_node'] = null;
+        }
     }
     unset($e);
 
@@ -284,11 +374,18 @@ function ttn_lastheard_events(int $days): array {
  *
  * Deliberately NOT wired here, with reasons (see TTN_TodoList for the
  * fuller writeup):
- * - EchoLink (ttn_enrich_echolink_callsign): blocked on Bobby's still-
- *   open conn_log investigation -- which connected_node/callsign
- *   values in AllStar-mode rows are actually EchoLink vs. genuine RF
- *   nodes isn't settled yet, so there's no principled way to pick
- *   which rows to call it against without guessing.
+ * - EchoLink (ttn_enrich_echolink_callsign): the "which rows are
+ *   EchoLink" question this was blocked on is now settled --
+ *   ttn_is_link_node_callsign() (v12) identifies a link node by its
+ *   sys_asl "-L" callsign suffix, and both the currently-keyed box and
+ *   relay-attribution tagging use it. Still NOT wired here: this
+ *   registry lookup answers "who is node 1900 registered to" (Bobby),
+ *   never "who is occupying it right now" (the actual EchoLink caller)
+ *   -- the confirmed incident this round was specifically that those
+ *   two are different, so calling this function here would just
+ *   re-introduce the same misattribution in enrichment form. Real
+ *   per-occupant attribution needs Asterisk/app_rpt's own live EchoLink
+ *   connection tracking, not this validation/registry endpoint.
  * - DVRef (ttn_enrich_dvref_p25_reflector): answers "which network does
  *   this designator route to," not "who transmitted this" -- it's
  *   page-level context (TTN's P25 gateway routes to reflector 276),
@@ -425,10 +522,18 @@ function ttn_lastheard_currently_keyed(): array {
             if ((time() - strtotime($r['since'])) > 300) {
                 continue;
             }
+            // v12: a link-type node (callsign ending "-L") is never shown
+            // as its registered owner here -- confirmed live this was
+            // exactly the incident: node 1900/"W4BWW-L" rendering
+            // "currently keyed" as Bobby mid-QSO with a real EchoLink
+            // caller, when the live occupant was the OTHER station. See
+            // ttn_is_link_node_callsign()'s comment above.
+            $is_link = ttn_is_link_node_callsign($r['callsign']);
             $keyed['AllStar'][] = [
-                'asl_number' => $r['asl_number'],
-                'callsign'   => $r['callsign'] ?: null,
-                'since'      => $r['since'],
+                'asl_number'   => $r['asl_number'],
+                'callsign'     => $is_link ? null : ($r['callsign'] ?: null),
+                'since'        => $r['since'],
+                'is_link_node' => $is_link,
                 // No 'stale' key -- every remaining row is already <5min
                 // old (older ones were filtered above), and lastheard.php's
                 // renderKeyed() treats a missing/falsy r.stale the same as

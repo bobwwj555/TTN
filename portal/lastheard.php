@@ -92,6 +92,22 @@
  * per Bobby's own root-node principle a relayed leg needs to say what
  * triggered it rather than sitting there looking like an unrelated,
  * independent origination.
+ *
+ * v12 (2026-09-26, later same day): a link-type AllStar node (EchoLink's
+ * own "-L" registration suffix -- see lastheard-query.php's
+ * ttn_is_link_node_callsign()) is never rendered under its registered
+ * owner's callsign, in either renderKeyed() or renderFeed()'s relay
+ * line. Confirmed live: node 1900 ("W4BWW-L", Bobby's own EchoLink link
+ * node) was showing "currently keyed" as W4BWW, and relayed DMR/P25 rows
+ * it actually triggered were showing "Relayed from AllStar node 450331"
+ * -- both crediting Bobby for the other EchoLink station's half of a
+ * real two-way QSO. renderKeyed() now shows "via EchoLink link node <n>
+ * -- remote station unknown" for a flagged row (`is_link_node`), and
+ * renderFeed() shows the same phrasing (no callsign, no link-out) when
+ * a row carries `relayed_via_link_node` instead of `relayed_from`. This
+ * is the interim display Bobby asked for while real per-occupant
+ * attribution (Asterisk/app_rpt's own EchoLink connection tracking)
+ * stays an open item.
  */
 
 require_once '/etc/ttn_config.php';
@@ -251,8 +267,15 @@ function renderKeyed(keyed) {
             const tgLabel = mode === 'DMR' && r.talkgroup
                 ? `<a class="call-link" href="https://tgif.network/lastheard.php" target="_blank" rel="noopener">${r.talkgroup}</a>`
                 : (r.talkgroup || '—');
+            // v12: a link-type node (r.is_link_node -- EchoLink's own
+            // "-L" registration suffix) never shows its registered
+            // owner's callsign here -- that owner isn't necessarily who
+            // it's actually carrying right now. See file header for the
+            // confirmed incident (node 1900/"W4BWW-L").
             const label = mode === 'AllStar'
-                ? (r.callsign ? `${qrzLink(r.callsign)} (node ${r.asl_number})` : `Node ${r.asl_number}`)
+                ? (r.is_link_node
+                    ? `via EchoLink link node ${r.asl_number} — remote station unknown`
+                    : (r.callsign ? `${qrzLink(r.callsign)} (node ${r.asl_number})` : `Node ${r.asl_number}`))
                 : `${qrzLink(r.callsign)} → ${tgLabel}`;
             return `<div class="box on ${r.stale ? 'stale' : ''}"><h4>${mode}${r.stale ? ' (stale?)' : ''}</h4>${label}<br><span style="color:var(--t3);font-size:0.75rem">since ${r.since}</span></div>`;
         }).join(''));
@@ -289,9 +312,17 @@ function renderFeed(events) {
         // them, per Bobby's root-node principle: this is the SAME event
         // crossing the bridge, not an unrelated origination, and the row
         // needs to say so rather than sitting there bare and unlinked.
+        // v12: a relay actually triggered by a link-type node (e.g.
+        // node 1900, Bobby's own EchoLink proxy) is tagged
+        // `relayed_via_link_node` instead of `relayed_from` -- shown
+        // with neither a callsign nor a link-out, since the registered
+        // owner isn't who's actually occupying it (the confirmed
+        // incident this round -- see file header).
         const relayHtml = e.relayed_from
             ? `<div class="sub">Relayed from <a class="call-link" href="http://stats.allstarlink.org/nodeinfo.cgi?node=${encodeURIComponent(e.relayed_from)}" target="_blank" rel="noopener">AllStar node ${e.relayed_from}</a></div>`
-            : '';
+            : (e.relayed_via_link_node
+                ? `<div class="sub">Relayed via EchoLink link node ${e.relayed_via_link_node} — remote station unknown</div>`
+                : '');
         return `
         <tr>
             <td class="mode">${e.mode}</td>
