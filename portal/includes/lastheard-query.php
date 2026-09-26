@@ -59,6 +59,14 @@
  * through the DVSwitch bridge, not an independent heartbeat. See that
  * function's own comment for the evidence. lastheard.php's renderFeed()
  * is updated in the same patch to display it.
+ *
+ * v11 (2026-09-26, later same day): ttn_lastheard_events() now dedupes
+ * exact-duplicate rows (same mode, same node/talkgroup, same displayed
+ * second) -- confirmed live that node 40245 wrote several such AllStar
+ * duplicates, one of which cascaded into a duplicate P25 relay row too.
+ * Display-layer fix only; the write-side cause is separate and needs
+ * its own fix on a different host/deploy path. See that function's own
+ * comment for the confirmed evidence.
  */
 
 function ttn_lastheard_events(int $days): array {
@@ -174,6 +182,40 @@ function ttn_lastheard_events(int $days): array {
             error_log("[lastheard] {$mode} query failed (check ttn_topology grant on this connection's DB user): " . $e->getMessage());
         }
     }
+
+    // v11 (2026-09-26, later same day): confirmed live -- node 40245
+    // wrote 3+ exact-duplicate AllStar 'key' rows during one busy
+    // multi-minute stretch (identical asl_number AND identical
+    // event_time to the second, e.g. two separate rows both at
+    // 21:27:48 and two more both at 21:28:38), and one of those
+    // duplicate keyups produced a duplicate P25 relay row too:
+    // p25_conn_log itself had two rows both connected_at=21:29:41 -- one
+    // a real 5-second transmission (disconnected_at 21:29:46), the
+    // other a spurious 0-duration row (disconnected_at 21:29:41, same
+    // second it began). Per Bobby: a real distinct human keyup does not
+    // land on the identical second as another one -- that's a
+    // write-side double-insert, not real traffic, the same tied-
+    // event_time phenomenon ttn_lastheard_currently_keyed() already had
+    // to dedupe for this exact node, just never applied here too.
+    // Deduped by (mode, detail, connected_at) -- same node/talkgroup,
+    // same displayed second -- keeping whichever copy has the later/
+    // longer disconnected_at (the real transmission in the confirmed
+    // P25 case above; AllStar carries no disconnected_at to prefer by,
+    // so either duplicate is kept arbitrarily since they're otherwise
+    // identical). This is a DISPLAY-layer fix only -- the write-side
+    // cause (most likely ttn-ptt-listener.php on VM700 for AllStar, and
+    // MMDVM_Bridge's own P25 log for the p25_conn_log case) lives on a
+    // host/deploy path this session hasn't touched yet and needs its
+    // own fix separately -- see chat.
+    $dedup_seen = [];
+    foreach ($events as $e) {
+        $key = $e['mode'] . '|' . $e['detail'] . '|' . $e['connected_at'];
+        if (!isset($dedup_seen[$key])
+            || ($e['disconnected_at'] ?? '') > ($dedup_seen[$key]['disconnected_at'] ?? '')) {
+            $dedup_seen[$key] = $e;
+        }
+    }
+    $events = array_values($dedup_seen);
 
     // v10 (2026-09-26, later same day): DMR/P25 rows tagged with the
     // AllStar keyup that triggered them, when one exists shortly before.
