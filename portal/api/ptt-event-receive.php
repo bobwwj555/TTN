@@ -18,9 +18,17 @@
  * Auth: same shared secret as telemetry-receive.php
  * (site_settings.telemetry_secret), same hash_equals() check.
  *
- * Requires/DB setup, secret validation and status codes below confirmed
- * verbatim against the real telemetry-receive.php on CT713 (2026-09-25) --
- * same pattern, not guessed.
+ * Requires, secret validation and status codes below confirmed verbatim
+ * against the real telemetry-receive.php on CT713 (2026-09-25).
+ *
+ * DB access uses the real portal/includes/db.php helper API (db_row(),
+ * db_insert(), s()) -- there is NO global $pdo exposed by that include;
+ * the PDO instance lives as a static inside ttn_db(). An earlier version
+ * of this file assumed a global $pdo (copying telemetry-receive.php's
+ * require lines without checking how it actually queries), which threw
+ * "Call to a member function prepare() on null" in production on
+ * 2026-09-25 -- fixed by switching to the helper functions, confirmed
+ * against the real db.php source.
  */
 
 require_once '/etc/ttn_config.php';
@@ -74,9 +82,7 @@ foreach ($events as $ev) {
         continue;
     }
 
-    $stmt = $pdo->prepare('SELECT system_id FROM sys_asl WHERE asl_number = ? LIMIT 1');
-    $stmt->execute([$asl_number]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $row = db_row('SELECT system_id FROM sys_asl WHERE asl_number = ? LIMIT 1', [$asl_number]);
 
     // Same non-fatal skip-and-report pattern as telemetry-receive.php's
     // handling of 1800/1801 -- an unresolved node is never a hard failure.
@@ -85,10 +91,12 @@ foreach ($events as $ev) {
         continue;
     }
 
-    $ins = $pdo->prepare(
-        'INSERT INTO ptt_log (system_id, asl_number, direction, event_time) VALUES (?, ?, ?, ?)'
-    );
-    $ins->execute([$row['system_id'], $asl_number, $direction, $event_time]);
+    db_insert('ptt_log', [
+        'system_id'  => $row['system_id'],
+        'asl_number' => $asl_number,
+        'direction'  => $direction,
+        'event_time' => $event_time,
+    ]);
     $saved++;
 }
 
